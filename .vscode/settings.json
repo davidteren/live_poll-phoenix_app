@@ -1,0 +1,11 @@
+{
+  "editor.formatOnSave": true,
+  "elixirLS.dialyzerEnabled": false,
+  "elixirLS.fetchDeps": true,
+  "files.associations": {
+    "*.heex": "heex"
+  },
+  "tailwindCSS.includeLanguages": {
+    "heex": "html"
+  }
+}

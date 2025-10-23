@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "JakeBecker.elixir-ls",
+    "bradlc.vscode-tailwindcss",
+    "pantajoe.vscode-elixir-credo"
+  ]
+}
