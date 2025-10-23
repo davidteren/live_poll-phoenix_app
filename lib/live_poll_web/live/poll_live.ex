@@ -29,7 +29,8 @@ defmodule LivePollWeb.PollLive do
         votes_per_minute: 0,
         last_minute_votes: 0,
         trend_data: trend_data,
-        time_range: 60  # Default time range in minutes
+        time_range: 60,  # Default time range in minutes
+        seeding_progress: %{show: false}  # Seeding progress modal state
       )
 
     # Schedule periodic stats update and trend tracking
@@ -139,6 +140,16 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("seed_data", _params, socket) do
+    # Show seeding modal
+    socket = assign(socket, :seeding_progress, %{show: true})
+
+    # Start seeding process asynchronously
+    Process.send_after(self(), :perform_seeding, 100)
+
+    {:noreply, socket}
+  end
+
+  def handle_info(:perform_seeding, socket) do
     # Programming languages with realistic popularity weights based on 2025 trends
     # Format: {language, popularity_weight}
     # Higher weight = more popular = more votes
@@ -274,7 +285,10 @@ defmodule LivePollWeb.PollLive do
       Repo.update!(changeset)
     end)
 
-    # Broadcast the update to all clients with seeded flag
+    # Hide progress modal after a short delay
+    Process.send_after(self(), :hide_seeding_progress, 800)
+
+    # Broadcast the update to all clients
     Phoenix.PubSub.broadcast(
       LivePoll.PubSub,
       @topic,
@@ -282,6 +296,10 @@ defmodule LivePollWeb.PollLive do
     )
 
     {:noreply, socket}
+  end
+
+  def handle_info(:hide_seeding_progress, socket) do
+    {:noreply, assign(socket, :seeding_progress, %{show: false})}
   end
 
   def handle_info({:poll_update, update_data}, socket) do
