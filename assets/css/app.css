@@ -111,178 +111,188 @@ body {
   overflow-x: hidden;
 }
 
-/* Modern glassmorphic design with vibrant colors */
+/* Catalyst-inspired design */
 .poll-container {
-  background:
-    radial-gradient(circle at 20% 30%, rgba(255, 107, 107, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(78, 205, 196, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(255, 195, 113, 0.1) 0%, transparent 50%),
-    linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: white;
   position: relative;
 }
 
 [data-theme="dark"] .poll-container {
-  background:
-    radial-gradient(circle at 20% 30%, rgba(255, 107, 107, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(78, 205, 196, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(255, 195, 113, 0.15) 0%, transparent 50%),
-    linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  background: #18181b;
 }
 
-.poll-card {
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(30px) saturate(180%);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-}
+/* Removed - using inline Tailwind classes */
 
-[data-theme="dark"] .poll-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
+/* Removed - using inline Tailwind classes */
 
-.option-card {
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.option-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.3),
-    transparent
-  );
-  transition: left 0.5s;
-}
-
-.option-card:hover::before {
-  left: 100%;
-}
-
-.option-card:hover {
-  transform: translateY(-4px) scale(1.01);
-  border-color: rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-[data-theme="dark"] .option-card {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-[data-theme="dark"] .option-card:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.25);
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
+/* Catalyst Button Styles - Teal/Emerald color */
 .vote-button {
-  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
-  box-shadow:
-    0 4px 15px rgba(255, 107, 107, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Base */
   position: relative;
-  overflow: hidden;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+
+  /* Teal color scheme */
+  color: white;
+  background: var(--btn-border);
+
+  /* Button background layer */
+  --btn-bg: #14b8a6;
+  --btn-border: #0d9488;
+  --btn-hover-overlay: rgba(255, 255, 255, 0.1);
+  --btn-icon: #99f6e4;
 }
 
 .vote-button::before {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  inset: 0;
+  z-index: -10;
+  border-radius: calc(0.5rem - 1px);
+  background: var(--btn-bg);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-.vote-button:hover::before {
-  width: 300px;
-  height: 300px;
+.vote-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  border-radius: calc(0.5rem - 1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
-.vote-button:hover {
-  background: linear-gradient(135deg, #FF8E53 0%, #FFC371 100%);
-  box-shadow:
-    0 6px 20px rgba(255, 107, 107, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transform: translateY(-2px) scale(1.05);
+.vote-button:hover::after {
+  background: var(--btn-hover-overlay);
 }
 
 .vote-button:active {
-  transform: translateY(0) scale(0.98);
-  box-shadow:
-    0 2px 8px rgba(255, 107, 107, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(0);
 }
 
 [data-theme="dark"] .vote-button {
-  background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
-  box-shadow:
-    0 4px 15px rgba(78, 205, 196, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: var(--btn-bg);
+  border-color: rgba(255, 255, 255, 0.05);
 }
 
-[data-theme="dark"] .vote-button:hover {
-  background: linear-gradient(135deg, #44A08D 0%, #093637 100%);
-  box-shadow:
-    0 6px 20px rgba(78, 205, 196, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+[data-theme="dark"] .vote-button::before {
+  display: none;
+}
+
+[data-theme="dark"] .vote-button::after {
+  inset: -1px;
+  border-radius: 0.5rem;
+}
+
+/* Reset Button - Red/Rose color */
+.reset-button {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  color: white;
+  background: var(--btn-border);
+  --btn-bg: #ef4444;
+  --btn-border: #dc2626;
+  --btn-hover-overlay: rgba(255, 255, 255, 0.1);
+}
+
+.reset-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  border-radius: calc(0.5rem - 1px);
+  background: var(--btn-bg);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.reset-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  border-radius: calc(0.5rem - 1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.reset-button:hover::after {
+  background: var(--btn-hover-overlay);
+}
+
+[data-theme="dark"] .reset-button {
+  background: var(--btn-bg);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .reset-button::before {
+  display: none;
+}
+
+[data-theme="dark"] .reset-button::after {
+  inset: -1px;
+  border-radius: 0.5rem;
 }
 
 .progress-bar-bg {
-  background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: rgba(20, 184, 166, 0.1);
 }
 
 [data-theme="dark"] .progress-bar-bg {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  background: rgba(20, 184, 166, 0.15);
 }
 
 .progress-bar-fill {
-  background: linear-gradient(90deg, #FF6B6B 0%, #FFC371 50%, #4ECDC4 100%);
-  box-shadow:
-    0 2px 8px rgba(255, 107, 107, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: width 0.6s ease-out;
   position: relative;
 }
 
-[data-theme="dark"] .progress-bar-fill {
-  background: linear-gradient(90deg, #4ECDC4 0%, #44A08D 50%, #FFC371 100%);
-  box-shadow:
-    0 2px 8px rgba(78, 205, 196, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+/* Language-specific progress bar colors */
+.progress-bar-fill[data-language="Elixir"] {
+  background: linear-gradient(90deg, #4e2a8e 0%, #6b46c1 100%);
+}
+
+.progress-bar-fill[data-language="Python"] {
+  background: linear-gradient(90deg, #3776ab 0%, #ffd43b 100%);
+}
+
+.progress-bar-fill[data-language="JavaScript"] {
+  background: linear-gradient(90deg, #f0db4f 0%, #f7df1e 100%);
+}
+
+.progress-bar-fill[data-language="Ruby"] {
+  background: linear-gradient(90deg, #cc342d 0%, #e74c3c 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="Elixir"] {
+  background: linear-gradient(90deg, #6b46c1 0%, #8b5cf6 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="Python"] {
+  background: linear-gradient(90deg, #4b8bbe 0%, #ffe873 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="JavaScript"] {
+  background: linear-gradient(90deg, #f7df1e 0%, #ffd700 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="Ruby"] {
+  background: linear-gradient(90deg, #e74c3c 0%, #ff6b6b 100%);
 }
 
 /* Typography refinements */
@@ -408,32 +418,136 @@ html {
   }
 }
 
-/* Floating particles effect */
-.poll-container::before,
-.poll-container::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.1;
-  animation: float 6s ease-in-out infinite;
-}
+/* Removed - using inline Tailwind classes */
 
-.poll-container::before {
-  width: 300px;
+/* Chart Container */
+.chart-container {
+  position: relative;
   height: 300px;
-  background: radial-gradient(circle, rgba(255, 107, 107, 0.4) 0%, transparent 70%);
-  top: 10%;
-  left: 5%;
-  animation-delay: 0s;
 }
 
-.poll-container::after {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(78, 205, 196, 0.4) 0%, transparent 70%);
-  bottom: 10%;
-  right: 5%;
-  animation-delay: 3s;
+/* Pie Chart Slice Colors - Language-specific */
+.chart-slice-elixir {
+  fill: #4e2a8e;
+}
+
+.chart-slice-python {
+  fill: #3776ab;
+}
+
+.chart-slice-javascript {
+  fill: #f0db4f;
+}
+
+.chart-slice-ruby {
+  fill: #cc342d;
+}
+
+[data-theme="dark"] .chart-slice-elixir {
+  fill: #6b46c1;
+}
+
+[data-theme="dark"] .chart-slice-python {
+  fill: #4b8bbe;
+}
+
+[data-theme="dark"] .chart-slice-javascript {
+  fill: #f7df1e;
+}
+
+[data-theme="dark"] .chart-slice-ruby {
+  fill: #e74c3c;
+}
+
+/* Bar Chart - Language-specific colors */
+.bar-chart-bar {
+  transition: all 0.6s ease-out;
+}
+
+.bar-chart-bar[data-language="Elixir"] {
+  background: linear-gradient(90deg, #4e2a8e 0%, #6b46c1 100%);
+}
+
+.bar-chart-bar[data-language="Python"] {
+  background: linear-gradient(90deg, #3776ab 0%, #ffd43b 100%);
+}
+
+.bar-chart-bar[data-language="JavaScript"] {
+  background: linear-gradient(90deg, #f0db4f 0%, #f7df1e 100%);
+}
+
+.bar-chart-bar[data-language="Ruby"] {
+  background: linear-gradient(90deg, #cc342d 0%, #e74c3c 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="Elixir"] {
+  background: linear-gradient(90deg, #6b46c1 0%, #8b5cf6 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="Python"] {
+  background: linear-gradient(90deg, #4b8bbe 0%, #ffe873 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="JavaScript"] {
+  background: linear-gradient(90deg, #f7df1e 0%, #ffd700 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="Ruby"] {
+  background: linear-gradient(90deg, #e74c3c 0%, #ff6b6b 100%);
+}
+
+/* Activity Feed */
+.activity-item {
+  border-left: 2px solid rgba(24, 24, 27, 0.1);
+  transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+  border-left-color: #52525b;
+  background: rgba(24, 24, 27, 0.025);
+}
+
+[data-theme="dark"] .activity-item {
+  border-left-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .activity-item:hover {
+  border-left-color: #71717a;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+/* Pulse Animation for Live Updates */
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+.live-indicator {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Counter Animation */
+@keyframes counter-update {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+    color: #2563eb;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.counter-animate {
+  animation: counter-update 0.3s ease-out;
 }
 
 /* Smooth gradient text */

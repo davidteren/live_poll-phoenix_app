@@ -1,77 +1,230 @@
-<div class="min-h-screen poll-container flex items-center justify-center px-4 py-6">
-  <div class="w-full max-w-7xl">
-    <%!-- Compact Header --%>
-    <div class="text-center mb-6">
-      <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 tracking-tight leading-tight">
-        <span class="bg-gradient-to-r from-rose-500 via-orange-400 to-teal-400 dark:from-teal-400 dark:via-orange-400 dark:to-rose-400 bg-clip-text text-transparent">
-          What's your favorite language?
-        </span>
-      </h1>
-      <p class="text-sm sm:text-base text-gray-600 dark:text-gray-400 font-light">
-        Vote now • <span class="font-semibold text-rose-500 dark:text-teal-400"><%= @total_votes %></span> total votes
+<div class="min-h-screen poll-container px-4 py-6 sm:px-6 lg:px-8">
+  <div class="w-full max-w-[1600px] mx-auto">
+    <%!-- Catalyst-style Header --%>
+    <div class="mb-8">
+      <div class="flex items-center justify-between mb-2">
+        <h1 class="text-2xl/8 font-semibold text-zinc-950 sm:text-xl/8 dark:text-white">
+          Programming Language Poll
+        </h1>
+        <div class="flex items-center gap-3">
+          <div class="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 bg-lime-400/20 text-lime-700 dark:bg-lime-400/10 dark:text-lime-300">
+            <div class="w-1.5 h-1.5 rounded-full bg-lime-600 dark:bg-lime-400 live-indicator"></div>
+            <span>Live</span>
+          </div>
+          <button phx-click="reset_votes" class="reset-button px-3 py-1.5 rounded-lg transition-all">
+            Reset All
+          </button>
+        </div>
+      </div>
+      <p class="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+        Real-time voting dashboard powered by Phoenix LiveView
       </p>
     </div>
 
-    <%!-- Glassmorphic Poll Card --%>
-    <div class="poll-card rounded-3xl p-5 sm:p-7 md:p-8">
-      <%!-- Grid Layout for Options --%>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-        <%= for option <- @options do %>
-          <div class="option-card rounded-2xl p-4 sm:p-5 group">
-            <%!-- Compact Option Layout --%>
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex-1 min-w-0">
-                <h3 class="text-xl sm:text-2xl font-bold mb-1 text-gray-900 dark:text-white truncate">
-                  <%= option.text %>
-                </h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                  <span class="font-semibold text-rose-500 dark:text-teal-400"><%= option.votes %></span>
-                  <%= if option.votes == 1, do: "vote", else: "votes" %>
-                  <span class="mx-2">•</span>
-                  <span class="font-bold"><%= percentage(option.votes, @total_votes) %>%</span>
-                </p>
-              </div>
+    <%!-- Catalyst-style Stats with Dividers and Color Accents --%>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+      <div>
+        <hr class="w-full border-t border-teal-500/20" />
+        <div class="mt-6 text-lg/6 font-medium sm:text-sm/6 text-zinc-950 dark:text-white">Total Votes</div>
+        <div class="mt-3 text-3xl/8 font-semibold sm:text-2xl/8 bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent counter-animate"><%= @total_votes %></div>
+        <div class="mt-3 text-sm/6 sm:text-xs/6">
+          <span class="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 bg-lime-400/20 text-lime-700 dark:bg-lime-400/10 dark:text-lime-300">
+            +<%= @votes_per_minute %>/min
+          </span>
+          <span class="text-zinc-500 dark:text-zinc-400"> live updates</span>
+        </div>
+      </div>
+      <div>
+        <hr class="w-full border-t border-sky-500/20" />
+        <div class="mt-6 text-lg/6 font-medium sm:text-sm/6 text-zinc-950 dark:text-white">Languages</div>
+        <div class="mt-3 text-3xl/8 font-semibold sm:text-2xl/8 bg-gradient-to-r from-sky-600 to-cyan-600 bg-clip-text text-transparent"><%= length(@options) %></div>
+        <div class="mt-3 text-sm/6 sm:text-xs/6">
+          <span class="text-zinc-500 dark:text-zinc-400">options available</span>
+        </div>
+      </div>
+      <div>
+        <hr class="w-full border-t border-rose-500/20" />
+        <div class="mt-6 text-lg/6 font-medium sm:text-sm/6 text-zinc-950 dark:text-white">Votes/Min</div>
+        <div class="mt-3 text-3xl/8 font-semibold sm:text-2xl/8 bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent"><%= @votes_per_minute %></div>
+        <div class="mt-3 text-sm/6 sm:text-xs/6">
+          <span class="text-zinc-500 dark:text-zinc-400">current velocity</span>
+        </div>
+      </div>
+      <div>
+        <hr class="w-full border-t border-amber-500/20" />
+        <div class="mt-6 text-lg/6 font-medium sm:text-sm/6 text-zinc-950 dark:text-white">Leader</div>
+        <div class="mt-3 text-3xl/8 font-semibold sm:text-2xl/8 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent truncate">
+          <%= if @total_votes > 0 do %>
+            <%= Enum.max_by(@options, & &1.votes).text %>
+          <% else %>
+            -
+          <% end %>
+        </div>
+        <div class="mt-3 text-sm/6 sm:text-xs/6">
+          <span class="text-zinc-500 dark:text-zinc-400">most popular</span>
+        </div>
+      </div>
+    </div>
 
-              <button
-                phx-click="vote"
-                phx-value-id={option.id}
-                class="vote-button text-white font-bold py-3 px-6 sm:px-8 rounded-xl text-sm sm:text-base whitespace-nowrap ml-4 flex-shrink-0"
-              >
-                Vote
-              </button>
-            </div>
-
-            <%!-- Vibrant Progress Bar --%>
-            <div class="progress-bar-bg w-full rounded-full h-2.5 overflow-hidden">
-              <div
-                class="progress-bar-fill h-2.5 rounded-full"
-                style={"width: #{percentage(option.votes, @total_votes)}%"}
-              >
+    <%!-- Main Dashboard Grid --%>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <%!-- Left Column: Voting Options --%>
+      <div class="lg:col-span-2 space-y-8">
+        <div>
+          <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Cast Your Vote</h2>
+          <div class="space-y-3">
+            <%= for option <- @options do %>
+              <div class="relative border border-zinc-950/10 dark:border-white/10 rounded-lg p-4 hover:border-zinc-950/20 dark:hover:border-white/20 transition-colors">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex-1">
+                    <h3 class="text-base/6 font-medium text-zinc-950 dark:text-white">
+                      <%= option.text %>
+                    </h3>
+                    <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">
+                      <%= option.votes %> <%= if option.votes == 1, do: "vote", else: "votes" %> • <%= percentage(option.votes, @total_votes) %>%
+                    </p>
+                  </div>
+                  <button
+                    phx-click="vote"
+                    phx-value-id={option.id}
+                    class="vote-button text-white font-semibold py-2 px-4 rounded-lg text-sm sm:text-xs/6"
+                  >
+                    Vote
+                  </button>
+                </div>
+                <div class="progress-bar-bg w-full rounded-full h-2 overflow-hidden">
+                  <div
+                    class="progress-bar-fill h-2 rounded-full"
+                    data-language={option.text}
+                    style={"width: #{percentage(option.votes, @total_votes)}%"}
+                  ></div>
+                </div>
               </div>
-            </div>
+            <% end %>
           </div>
-        <% end %>
+        </div>
+
+        <%!-- Bar Chart --%>
+        <div>
+          <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Vote Distribution</h2>
+          <div class="space-y-4">
+            <%= for {option, index} <- Enum.with_index(@options) do %>
+              <div>
+                <div class="flex justify-between text-sm/6 mb-2">
+                  <span class="font-medium text-zinc-700 dark:text-zinc-300"><%= option.text %></span>
+                  <span class="font-semibold text-zinc-950 dark:text-white"><%= option.votes %></span>
+                </div>
+                <div class="h-8 bg-zinc-950/5 dark:bg-white/5 rounded-lg overflow-hidden">
+                  <div
+                    class="bar-chart-bar h-full rounded-lg flex items-center justify-end pr-3"
+                    data-language={option.text}
+                    style={"width: #{percentage(option.votes, @total_votes)}%"}
+                  >
+                    <span class="text-white text-xs font-bold"><%= percentage(option.votes, @total_votes) %>%</span>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
       </div>
 
-      <%!-- Compact Stats Footer --%>
-      <div class="mt-4 pt-4 border-t border-white/20 dark:border-white/10">
-        <div class="flex items-center justify-center gap-6 text-xs sm:text-sm">
-          <div class="flex items-center gap-2">
-            <div class="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-rose-500 to-orange-400"></div>
-            <span class="text-gray-700 dark:text-gray-300 font-medium">Live Updates</span>
+      <%!-- Right Column: Charts & Activity --%>
+      <div class="space-y-8">
+        <%!-- Pie Chart --%>
+        <div>
+          <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Results Overview</h2>
+          <div class="flex items-center justify-center py-8">
+            <%= if @total_votes > 0 do %>
+              <div class="relative w-full max-w-[200px] aspect-square">
+                <svg viewBox="0 0 200 200" class="w-full h-full">
+                  <%!-- Calculate pie slices using path elements --%>
+                  <%= for option <- @options do %>
+                    <% previous_total = Enum.take_while(@options, fn o -> o.id != option.id end) |> Enum.map(& &1.votes) |> Enum.sum() %>
+                    <% start_angle = (previous_total / @total_votes) * 360 %>
+                    <% slice_angle = (option.votes / @total_votes) * 360 %>
+                    <% end_angle = start_angle + slice_angle %>
+
+                    <%!-- Convert angles to radians --%>
+                    <% start_rad = (start_angle - 90) * :math.pi() / 180 %>
+                    <% end_rad = (end_angle - 90) * :math.pi() / 180 %>
+
+                    <%!-- Outer arc points --%>
+                    <% outer_radius = 90 %>
+                    <% inner_radius = 50 %>
+                    <% x1 = 100 + outer_radius * :math.cos(start_rad) %>
+                    <% y1 = 100 + outer_radius * :math.sin(start_rad) %>
+                    <% x2 = 100 + outer_radius * :math.cos(end_rad) %>
+                    <% y2 = 100 + outer_radius * :math.sin(end_rad) %>
+
+                    <%!-- Inner arc points --%>
+                    <% x3 = 100 + inner_radius * :math.cos(end_rad) %>
+                    <% y3 = 100 + inner_radius * :math.sin(end_rad) %>
+                    <% x4 = 100 + inner_radius * :math.cos(start_rad) %>
+                    <% y4 = 100 + inner_radius * :math.sin(start_rad) %>
+
+                    <% large_arc = if slice_angle > 180, do: 1, else: 0 %>
+                    <% language_class = String.downcase(option.text) %>
+
+                    <path
+                      d={"M #{x1} #{y1} A #{outer_radius} #{outer_radius} 0 #{large_arc} 1 #{x2} #{y2} L #{x3} #{y3} A #{inner_radius} #{inner_radius} 0 #{large_arc} 0 #{x4} #{y4} Z"}
+                      class={"chart-slice-#{language_class}"}
+                      stroke="white"
+                      stroke-width="2"
+                    />
+                  <% end %>
+                </svg>
+              </div>
+            <% else %>
+              <div class="text-center text-zinc-500 dark:text-zinc-400">No votes yet</div>
+            <% end %>
           </div>
-          <div class="flex items-center gap-2">
-            <div class="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-teal-400 to-cyan-400"></div>
-            <span class="text-gray-700 dark:text-gray-300 font-medium">Real-time</span>
+          <div class="mt-4 space-y-2">
+            <%= for option <- @options do %>
+              <% language_class = String.downcase(option.text) %>
+              <div class="flex items-center gap-2 text-sm/6">
+                <div class={"w-3 h-3 rounded-sm chart-slice-#{language_class}"}></div>
+                <span class="text-zinc-700 dark:text-zinc-300"><%= option.text %></span>
+                <span class="ml-auto font-semibold text-zinc-950 dark:text-white"><%= percentage(option.votes, @total_votes) %>%</span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <%!-- Live Activity Feed --%>
+        <div>
+          <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Live Activity</h2>
+          <div class="space-y-2 max-h-[300px] overflow-y-auto">
+            <%= if @recent_activity == [] do %>
+              <p class="text-sm/6 text-zinc-500 dark:text-zinc-400 text-center py-4">
+                Waiting for votes...
+              </p>
+            <% else %>
+              <%= for activity <- @recent_activity do %>
+                <div class="activity-item pl-4 py-2 rounded">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="text-sm/6 font-medium text-zinc-950 dark:text-white">
+                        <%= activity.language %>
+                      </span>
+                      <p class="text-xs/5 text-zinc-500 dark:text-zinc-400">
+                        <%= Calendar.strftime(activity.timestamp, "%H:%M:%S") %>
+                      </p>
+                    </div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-lime-600 dark:bg-lime-400"></div>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
           </div>
         </div>
       </div>
     </div>
 
-    <%!-- Minimal Footer --%>
-    <div class="text-center mt-4">
-      <p class="text-xs text-gray-500 dark:text-gray-600 font-light">
-        Powered by Phoenix LiveView
+    <%!-- Footer --%>
+    <div class="text-center mt-8">
+      <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">
+        Powered by Phoenix LiveView • Real-time updates via WebSockets
       </p>
     </div>
   </div>
