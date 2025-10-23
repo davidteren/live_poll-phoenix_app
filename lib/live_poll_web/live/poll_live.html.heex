@@ -135,49 +135,35 @@
         <div>
           <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Results Overview</h2>
           <div class="flex items-center justify-center py-8">
-            <%= if @total_votes > 0 do %>
-              <div class="relative w-full max-w-[200px] aspect-square">
-                <svg viewBox="0 0 200 200" class="w-full h-full">
-                  <%!-- Calculate pie slices using path elements --%>
+            <div class="relative w-full max-w-[200px] aspect-square">
+              <svg viewBox="0 0 200 200" class="w-full h-full">
+                <%= if @total_votes == 0 do %>
+                  <%!-- Empty state: grey donut --%>
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="70"
+                    fill="none"
+                    stroke="#d4d4d8"
+                    stroke-width="40"
+                    class="dark:stroke-zinc-700"
+                  />
+                <% else %>
+                  <%!-- Render pie slices using helper function --%>
                   <%= for option <- @options do %>
-                    <% previous_total = Enum.take_while(@options, fn o -> o.id != option.id end) |> Enum.map(& &1.votes) |> Enum.sum() %>
-                    <% start_angle = (previous_total / @total_votes) * 360 %>
-                    <% slice_angle = (option.votes / @total_votes) * 360 %>
-                    <% end_angle = start_angle + slice_angle %>
-
-                    <%!-- Convert angles to radians --%>
-                    <% start_rad = (start_angle - 90) * :math.pi() / 180 %>
-                    <% end_rad = (end_angle - 90) * :math.pi() / 180 %>
-
-                    <%!-- Outer arc points --%>
-                    <% outer_radius = 90 %>
-                    <% inner_radius = 50 %>
-                    <% x1 = 100 + outer_radius * :math.cos(start_rad) %>
-                    <% y1 = 100 + outer_radius * :math.sin(start_rad) %>
-                    <% x2 = 100 + outer_radius * :math.cos(end_rad) %>
-                    <% y2 = 100 + outer_radius * :math.sin(end_rad) %>
-
-                    <%!-- Inner arc points --%>
-                    <% x3 = 100 + inner_radius * :math.cos(end_rad) %>
-                    <% y3 = 100 + inner_radius * :math.sin(end_rad) %>
-                    <% x4 = 100 + inner_radius * :math.cos(start_rad) %>
-                    <% y4 = 100 + inner_radius * :math.sin(start_rad) %>
-
-                    <% large_arc = if slice_angle > 180, do: 1, else: 0 %>
-                    <% language_class = String.downcase(option.text) %>
-
-                    <path
-                      d={"M #{x1} #{y1} A #{outer_radius} #{outer_radius} 0 #{large_arc} 1 #{x2} #{y2} L #{x3} #{y3} A #{inner_radius} #{inner_radius} 0 #{large_arc} 0 #{x4} #{y4} Z"}
-                      class={"chart-slice-#{language_class}"}
-                      stroke="white"
-                      stroke-width="2"
-                    />
+                    <%= if option.votes > 0 do %>
+                      <% language_class = String.downcase(option.text) %>
+                      <path
+                        d={pie_slice_path(option, @options, @total_votes)}
+                        class={"chart-slice-#{language_class}"}
+                        stroke="white"
+                        stroke-width="2"
+                      />
+                    <% end %>
                   <% end %>
-                </svg>
-              </div>
-            <% else %>
-              <div class="text-center text-zinc-500 dark:text-zinc-400">No votes yet</div>
-            <% end %>
+                <% end %>
+              </svg>
+            </div>
           </div>
           <div class="mt-4 space-y-2">
             <%= for option <- @options do %>

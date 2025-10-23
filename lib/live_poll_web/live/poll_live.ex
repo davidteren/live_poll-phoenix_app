@@ -134,4 +134,65 @@ defmodule LivePollWeb.PollLive do
   end
 
   defp percentage(_votes, _total), do: 0
+
+  # Helper function to generate pie chart path for a slice
+  defp pie_slice_path(_option, _options, 0), do: ""
+
+  defp pie_slice_path(option, options, total_votes) when total_votes > 0 do
+    # Skip if this option has no votes
+    if option.votes == 0 do
+      ""
+    else
+      # Calculate angles
+      previous_votes =
+        Enum.take_while(options, fn o -> o.id != option.id end)
+        |> Enum.map(& &1.votes)
+        |> Enum.sum()
+
+      start_angle = (previous_votes / total_votes) * 360
+      slice_angle = (option.votes / total_votes) * 360
+      end_angle = start_angle + slice_angle
+
+      # If this option has 100% of votes, draw a full circle
+      if slice_angle >= 359.9 do
+        # Draw a full donut using two semicircles
+        outer_radius = 90
+        inner_radius = 50
+
+        # First semicircle (top half)
+        path1 = "M 100 #{100 - outer_radius} A #{outer_radius} #{outer_radius} 0 0 1 100 #{100 + outer_radius}"
+        # Second semicircle (bottom half)
+        path2 = "A #{outer_radius} #{outer_radius} 0 0 1 100 #{100 - outer_radius}"
+        # Inner circle (reverse direction)
+        path3 = "M 100 #{100 - inner_radius} A #{inner_radius} #{inner_radius} 0 0 0 100 #{100 + inner_radius}"
+        path4 = "A #{inner_radius} #{inner_radius} 0 0 0 100 #{100 - inner_radius}"
+
+        "#{path1} #{path2} #{path3} #{path4} Z"
+      else
+        # Convert to radians (subtract 90 to start from top)
+        start_rad = (start_angle - 90) * :math.pi() / 180
+        end_rad = (end_angle - 90) * :math.pi() / 180
+
+        # Define radii
+        outer_radius = 90
+        inner_radius = 50
+
+        # Calculate points
+        x1 = 100 + outer_radius * :math.cos(start_rad)
+        y1 = 100 + outer_radius * :math.sin(start_rad)
+        x2 = 100 + outer_radius * :math.cos(end_rad)
+        y2 = 100 + outer_radius * :math.sin(end_rad)
+        x3 = 100 + inner_radius * :math.cos(end_rad)
+        y3 = 100 + inner_radius * :math.sin(end_rad)
+        x4 = 100 + inner_radius * :math.cos(start_rad)
+        y4 = 100 + inner_radius * :math.sin(start_rad)
+
+        # Large arc flag
+        large_arc = if slice_angle > 180, do: 1, else: 0
+
+        # Build path
+        "M #{x1} #{y1} A #{outer_radius} #{outer_radius} 0 #{large_arc} 1 #{x2} #{y2} L #{x3} #{y3} A #{inner_radius} #{inner_radius} 0 #{large_arc} 0 #{x4} #{y4} Z"
+      end
+    end
+  end
 end

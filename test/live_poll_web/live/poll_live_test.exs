@@ -160,7 +160,7 @@ defmodule LivePollWeb.PollLiveTest do
       assert html =~ "chart-slice-ruby"
     end
 
-    test "calculates correct SVG circle parameters for donut chart", %{conn: conn, options: [elixir, python | _]} do
+    test "calculates correct SVG path parameters for donut chart", %{conn: conn, options: [elixir, python | _]} do
       # Set votes: Elixir 75, Python 25 (total 100 for easy math)
       Repo.update!(Ecto.Changeset.change(elixir, votes: 75))
       Repo.update!(Ecto.Changeset.change(python, votes: 25))
@@ -169,15 +169,16 @@ defmodule LivePollWeb.PollLiveTest do
 
       html = render(view)
 
-      # Verify SVG circle elements are present
+      # Verify SVG path elements are present
       assert html =~ "viewBox=\"0 0 200 200\""
-      assert html =~ "r=\"80\""
-      assert html =~ "stroke-width=\"40\""
+      assert html =~ "<path"
+      assert html =~ "stroke=\"white\""
+      assert html =~ "stroke-width=\"2\""
 
-      # The circumference should be 2 * π * 80 ≈ 502.65
-      # Elixir (75%) should have dash_length ≈ 377
-      # Python (25%) should have dash_length ≈ 125
-      # These will be in the stroke-dasharray attribute
+      # Verify the path uses the 'd' attribute for drawing
+      assert html =~ "d=\"M"
+      assert html =~ "A 90 90"  # Outer arc with radius 90
+      assert html =~ "A 50 50"  # Inner arc with radius 50
     end
 
     test "handles zero votes gracefully", %{conn: conn} do
@@ -185,8 +186,27 @@ defmodule LivePollWeb.PollLiveTest do
 
       html = render(view)
 
-      # Should show "No votes yet" message
-      assert html =~ "No votes yet"
+      # Should show grey circle when no votes
+      assert html =~ "stroke=\"#d4d4d8\""
+      assert html =~ "r=\"70\""
+      assert html =~ "stroke-width=\"40\""
+    end
+
+    test "shows full circle when only one option has votes", %{conn: conn, options: [elixir | _]} do
+      # Give only Elixir votes
+      Repo.update!(Ecto.Changeset.change(elixir, votes: 100))
+
+      {:ok, view, _html} = live(conn, "/")
+
+      html = render(view)
+
+      # Should show full circle for Elixir (100%)
+      assert html =~ ~s(<path d="M 100 10 A 90 90)
+      assert html =~ "chart-slice-elixir"
+
+      # Should only have ONE path element (for Elixir)
+      path_count = html |> String.split("<path") |> length() |> Kernel.-(1)
+      assert path_count == 1
     end
 
     test "calculates cumulative offsets correctly for multiple segments", %{conn: conn, options: [elixir, python, javascript, ruby]} do
