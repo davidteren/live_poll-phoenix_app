@@ -15,7 +15,9 @@
         const setTheme = (theme) => {
           if (theme === "system") {
             localStorage.removeItem("phx:theme");
-            document.documentElement.removeAttribute("data-theme");
+            // Detect system preference and set data-theme accordingly
+            const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
           } else {
             localStorage.setItem("phx:theme", theme);
             document.documentElement.setAttribute("data-theme", theme);
@@ -25,7 +27,14 @@
           setTheme(localStorage.getItem("phx:theme") || "system");
         }
         window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
-        
+
+        // Listen for system theme changes
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+          if (!localStorage.getItem("phx:theme")) {
+            document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+          }
+        });
+
         window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
       })();
     </script>

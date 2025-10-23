@@ -1,38 +1,78 @@
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-  <div class="max-w-4xl mx-auto">
-    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 sm:p-12">
-      <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-center mb-12 text-gray-900 dark:text-gray-100 leading-tight">
-        What is your favorite programming language? (Updated)
+<div class="min-h-screen poll-container flex items-center justify-center px-4 py-6">
+  <div class="w-full max-w-7xl">
+    <%!-- Compact Header --%>
+    <div class="text-center mb-6">
+      <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 tracking-tight leading-tight">
+        <span class="bg-gradient-to-r from-rose-500 via-orange-400 to-teal-400 dark:from-teal-400 dark:via-orange-400 dark:to-rose-400 bg-clip-text text-transparent">
+          What's your favorite language?
+        </span>
       </h1>
+      <p class="text-sm sm:text-base text-gray-600 dark:text-gray-400 font-light">
+        Vote now • <span class="font-semibold text-rose-500 dark:text-teal-400"><%= @total_votes %></span> total votes
+      </p>
+    </div>
 
-      <div class="grid gap-6 sm:gap-8">
+    <%!-- Glassmorphic Poll Card --%>
+    <div class="poll-card rounded-3xl p-5 sm:p-7 md:p-8">
+      <%!-- Grid Layout for Options --%>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         <%= for option <- @options do %>
-          <div class="bg-gray-50 dark:bg-gray-700 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-600 hover:shadow-lg dark:hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-              <span class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-200"><%= option.text %></span>
+          <div class="option-card rounded-2xl p-4 sm:p-5 group">
+            <%!-- Compact Option Layout --%>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex-1 min-w-0">
+                <h3 class="text-xl sm:text-2xl font-bold mb-1 text-gray-900 dark:text-white truncate">
+                  <%= option.text %>
+                </h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                  <span class="font-semibold text-rose-500 dark:text-teal-400"><%= option.votes %></span>
+                  <%= if option.votes == 1, do: "vote", else: "votes" %>
+                  <span class="mx-2">•</span>
+                  <span class="font-bold"><%= percentage(option.votes, @total_votes) %>%</span>
+                </p>
+              </div>
+
               <button
                 phx-click="vote"
                 phx-value-id={option.id}
-                class="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg"
+                class="vote-button text-white font-bold py-3 px-6 sm:px-8 rounded-xl text-sm sm:text-base whitespace-nowrap ml-4 flex-shrink-0"
               >
                 Vote
               </button>
             </div>
-            <div class="text-lg text-gray-600 dark:text-gray-400 mb-4">
-              <%= option.votes %> votes
-            </div>
-            <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-8 overflow-hidden shadow-inner">
+
+            <%!-- Vibrant Progress Bar --%>
+            <div class="progress-bar-bg w-full rounded-full h-2.5 overflow-hidden">
               <div
-                class="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-400 dark:to-indigo-500 h-8 rounded-full transition-all duration-700 ease-out shadow-sm"
+                class="progress-bar-fill h-2.5 rounded-full"
                 style={"width: #{percentage(option.votes, @total_votes)}%"}
-              ></div>
-            </div>
-            <div class="text-right text-sm text-gray-500 dark:text-gray-400 mt-2 font-medium">
-              <%= percentage(option.votes, @total_votes) %>%
+              >
+              </div>
             </div>
           </div>
         <% end %>
       </div>
+
+      <%!-- Compact Stats Footer --%>
+      <div class="mt-4 pt-4 border-t border-white/20 dark:border-white/10">
+        <div class="flex items-center justify-center gap-6 text-xs sm:text-sm">
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-rose-500 to-orange-400"></div>
+            <span class="text-gray-700 dark:text-gray-300 font-medium">Live Updates</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-teal-400 to-cyan-400"></div>
+            <span class="text-gray-700 dark:text-gray-300 font-medium">Real-time</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%!-- Minimal Footer --%>
+    <div class="text-center mt-4">
+      <p class="text-xs text-gray-500 dark:text-gray-600 font-light">
+        Powered by Phoenix LiveView
+      </p>
     </div>
   </div>
 </div>

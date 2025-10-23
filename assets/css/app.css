@@ -105,7 +105,348 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
-/* This file is for your main application CSS */
+/* Modern glassmorphic design with vibrant colors */
+.poll-container {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 107, 107, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(78, 205, 196, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(255, 195, 113, 0.1) 0%, transparent 50%),
+    linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  position: relative;
+}
+
+[data-theme="dark"] .poll-container {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 107, 107, 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(78, 205, 196, 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(255, 195, 113, 0.15) 0%, transparent 50%),
+    linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+}
+
+.poll-card {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] .poll-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.option-card {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.option-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.option-card:hover::before {
+  left: 100%;
+}
+
+.option-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="dark"] .option-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .option-card:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.vote-button {
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  box-shadow:
+    0 4px 15px rgba(255, 107, 107, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.vote-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.vote-button:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.vote-button:hover {
+  background: linear-gradient(135deg, #FF8E53 0%, #FFC371 100%);
+  box-shadow:
+    0 6px 20px rgba(255, 107, 107, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px) scale(1.05);
+}
+
+.vote-button:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow:
+    0 2px 8px rgba(255, 107, 107, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .vote-button {
+  background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
+  box-shadow:
+    0 4px 15px rgba(78, 205, 196, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .vote-button:hover {
+  background: linear-gradient(135deg, #44A08D 0%, #093637 100%);
+  box-shadow:
+    0 6px 20px rgba(78, 205, 196, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.progress-bar-bg {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .progress-bar-bg {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.progress-bar-fill {
+  background: linear-gradient(90deg, #FF6B6B 0%, #FFC371 50%, #4ECDC4 100%);
+  box-shadow:
+    0 2px 8px rgba(255, 107, 107, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+
+[data-theme="dark"] .progress-bar-fill {
+  background: linear-gradient(90deg, #4ECDC4 0%, #44A08D 50%, #FFC371 100%);
+  box-shadow:
+    0 2px 8px rgba(78, 205, 196, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Typography refinements */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus states for accessibility */
+.vote-button:focus-visible {
+  outline: 2px solid #FF6B6B;
+  outline-offset: 3px;
+}
+
+[data-theme="dark"] .vote-button:focus-visible {
+  outline-color: #4ECDC4;
+}
+
+/* Loading state animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.option-card.phx-click-loading {
+  animation: pulse-glow 1s ease-in-out infinite;
+}
+
+/* Vibrant text selection */
+::selection {
+  background-color: rgba(255, 107, 107, 0.3);
+  color: inherit;
+}
+
+[data-theme="dark"] ::selection {
+  background-color: rgba(78, 205, 196, 0.3);
+}
+
+/* Entrance animations */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.option-card {
+  animation: fade-in-up 0.5s ease-out backwards;
+}
+
+.option-card:nth-child(1) { animation-delay: 0.1s; }
+.option-card:nth-child(2) { animation-delay: 0.15s; }
+.option-card:nth-child(3) { animation-delay: 0.2s; }
+.option-card:nth-child(4) { animation-delay: 0.25s; }
+.option-card:nth-child(5) { animation-delay: 0.3s; }
+.option-card:nth-child(6) { animation-delay: 0.35s; }
+.option-card:nth-child(7) { animation-delay: 0.4s; }
+.option-card:nth-child(8) { animation-delay: 0.45s; }
+
+/* Floating animation for background elements */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+/* Add subtle glow to cards */
+.option-card {
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .option-card {
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Improved progress bar animation */
+.progress-bar-fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Floating particles effect */
+.poll-container::before,
+.poll-container::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.1;
+  animation: float 6s ease-in-out infinite;
+}
+
+.poll-container::before {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(255, 107, 107, 0.4) 0%, transparent 70%);
+  top: 10%;
+  left: 5%;
+  animation-delay: 0s;
+}
+
+.poll-container::after {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(78, 205, 196, 0.4) 0%, transparent 70%);
+  bottom: 10%;
+  right: 5%;
+  animation-delay: 3s;
+}
+
+/* Smooth gradient text */
+.gradient-text {
+  background-size: 200% auto;
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% center;
+  }
+  50% {
+    background-position: 100% center;
+  }
+}
