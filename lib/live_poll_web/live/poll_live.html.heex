@@ -151,36 +151,37 @@
 
         <%!-- Trend Line Chart --%>
         <div>
-          <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Voting Trends</h2>
-          <div class="relative h-64 bg-zinc-950/5 dark:bg-white/5 rounded-lg p-4">
-            <%= if length(@trend_data) > 1 do %>
-              <svg viewBox="0 0 600 200" class="w-full h-full" preserveAspectRatio="none">
-                <%!-- Grid lines --%>
-                <line x1="0" y1="0" x2="600" y2="0" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
-                <line x1="0" y1="50" x2="600" y2="50" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
-                <line x1="0" y1="100" x2="600" y2="100" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
-                <line x1="0" y1="150" x2="600" y2="150" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
-                <line x1="0" y1="200" x2="600" y2="200" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">Voting Trends</h2>
 
-                <%!-- Draw lines for each language --%>
-                <%= for option <- @sorted_options do %>
-                  <% language_class = language_to_class(option.text) %>
-                  <% points = trend_line_points(option.text, @trend_data) %>
-                  <%= if points != "" do %>
-                    <polyline
-                      points={points}
-                      fill="none"
-                      stroke-width="2"
-                      class={"trend-line-#{language_class}"}
-                    />
-                  <% end %>
-                <% end %>
-              </svg>
-            <% else %>
-              <div class="flex items-center justify-center h-full text-zinc-500 dark:text-zinc-400 text-sm">
-                Collecting trend data...
-              </div>
-            <% end %>
+            <%!-- Time Range Selector --%>
+            <div class="flex items-center gap-1">
+              <%= for {label, minutes} <- [{"5m", 5}, {"1h", 60}, {"12h", 720}, {"24h", 1440}] do %>
+                <button
+                  phx-click="change_time_range"
+                  phx-value-range={minutes}
+                  class={[
+                    "px-2 py-1 text-xs rounded transition-all font-medium",
+                    if(@time_range == minutes,
+                      do: "bg-blue-600 text-white border border-blue-700 dark:border-blue-500",
+                      else: "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    )
+                  ]}
+                >
+                  <%= label %>
+                </button>
+              <% end %>
+            </div>
+          </div>
+
+          <div
+            id="trend-chart"
+            phx-hook="TrendChart"
+            phx-update="ignore"
+            data-trend-data={Jason.encode!(@trend_data)}
+            data-languages={Jason.encode!(@sorted_options |> Enum.map(& &1.text))}
+            class="w-full h-[400px] bg-zinc-950/5 dark:bg-white/5 rounded-lg"
+          >
           </div>
         </div>
       </div>
@@ -190,40 +191,13 @@
         <%!-- Pie Chart --%>
         <div>
           <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Results Overview</h2>
-          <div class="flex items-center justify-center py-8">
-            <div class="relative w-full max-w-[200px] aspect-square">
-              <svg viewBox="0 0 200 200" class="w-full h-full">
-                <%= if @total_votes == 0 do %>
-                  <%!-- Empty state: grey donut --%>
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="70"
-                    fill="none"
-                    stroke="#d4d4d8"
-                    stroke-width="40"
-                    class="dark:stroke-zinc-700"
-                  />
-                  <%!-- Center text for empty state --%>
-                  <text x="100" y="100" text-anchor="middle" dominant-baseline="middle" class="fill-zinc-500 dark:fill-zinc-400 text-sm font-medium">
-                    No votes
-                  </text>
-                <% else %>
-                  <%!-- Render pie slices using helper function - sorted by votes --%>
-                  <%= for option <- @sorted_options do %>
-                    <%= if option.votes > 0 do %>
-                      <% language_class = language_to_class(option.text) %>
-                      <path
-                        d={pie_slice_path(option, @sorted_options, @total_votes)}
-                        class={"chart-slice-#{language_class}"}
-                        stroke="white"
-                        stroke-width="2"
-                      />
-                    <% end %>
-                  <% end %>
-                <% end %>
-              </svg>
-            </div>
+          <div
+            id="pie-chart"
+            phx-hook="PieChart"
+            phx-update="ignore"
+            data-chart-data={Jason.encode!(@sorted_options |> Enum.map(fn opt -> %{name: opt.text, votes: opt.votes} end))}
+            class="w-full h-[300px]"
+          >
           </div>
 
           <%!-- Legend with ranking, language names and colors - sorted by popularity --%>

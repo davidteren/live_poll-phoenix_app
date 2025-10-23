@@ -2,7 +2,9 @@ defmodule LivePollWeb.PollLive do
   use LivePollWeb, :live_view
 
   alias LivePoll.Poll.Option
+  alias LivePoll.Poll.VoteEvent
   alias LivePoll.Repo
+  import Ecto.Query
 
   @topic "poll:updates"
 
@@ -15,12 +17,8 @@ defmodule LivePollWeb.PollLive do
     # Sort options by votes for pie chart (descending)
     sorted_options = Enum.sort_by(options, & &1.votes, :desc)
 
-    # Initialize trend data - store last 60 data points (5 minutes at 5-second intervals)
-    now = DateTime.utc_now()
-    initial_snapshot = %{
-      timestamp: now,
-      percentages: calculate_percentages(options, total_votes)
-    }
+    # Initialize trend data from vote events in database (default: 1 hour)
+    trend_data = build_trend_data_from_events(60)
 
     socket =
       assign(socket,
@@ -30,7 +28,8 @@ defmodule LivePollWeb.PollLive do
         recent_activity: [],
         votes_per_minute: 0,
         last_minute_votes: 0,
-        trend_data: [initial_snapshot]
+        trend_data: trend_data,
+        time_range: 60  # Default time range in minutes
       )
 
     # Schedule periodic stats update and trend tracking
@@ -44,15 +43,24 @@ defmodule LivePollWeb.PollLive do
 
   def handle_event("vote", %{"id" => id}, socket) do
     option = Repo.get!(Option, id)
-    changeset = Ecto.Changeset.change(option, votes: option.votes + 1)
-    Repo.update!(changeset)
+    new_votes = option.votes + 1
+    changeset = Ecto.Changeset.change(option, votes: new_votes)
+    updated_option = Repo.update!(changeset)
+
+    # Capture vote event in time series
+    Repo.insert!(%VoteEvent{
+      option_id: updated_option.id,
+      language: updated_option.text,
+      votes_after: new_votes,
+      event_type: "vote"
+    })
 
     Phoenix.PubSub.broadcast(
       LivePoll.PubSub,
       @topic,
       {:poll_update, %{
         id: String.to_integer(id),
-        votes: option.votes + 1,
+        votes: new_votes,
         language: option.text,
         timestamp: DateTime.utc_now()
       }}
@@ -66,11 +74,19 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("reset_votes", _params, socket) do
-    # Reset all votes to 0
+    # Reset all votes to 0 and capture reset events
     Repo.all(Option)
     |> Enum.each(fn option ->
       changeset = Ecto.Changeset.change(option, votes: 0)
-      Repo.update!(changeset)
+      updated_option = Repo.update!(changeset)
+
+      # Capture reset event
+      Repo.insert!(%VoteEvent{
+        option_id: updated_option.id,
+        language: updated_option.text,
+        votes_after: 0,
+        event_type: "reset"
+      })
     end)
 
     # Broadcast reset to all connected clients
@@ -110,6 +126,26 @@ defmodule LivePollWeb.PollLive do
     {:noreply, socket}
   end
 
+  def handle_event("change_time_range", %{"range" => range_str}, socket) do
+    range_minutes = String.to_integer(range_str)
+    trend_data = build_trend_data_from_events(range_minutes)
+
+    socket =
+      socket
+      |> assign(:time_range, range_minutes)
+      |> assign(:trend_data, trend_data)
+
+    # Push updated trend data to chart
+    languages = socket.assigns.sorted_options |> Enum.map(& &1.text)
+
+    {:noreply,
+      push_event(socket, "update-trend-chart", %{
+        trendData: trend_data,
+        languages: languages
+      })
+    }
+  end
+
   def handle_event("seed_data", _params, socket) do
     # List of popular programming languages
     languages = [
@@ -118,17 +154,96 @@ defmodule LivePollWeb.PollLive do
       "C++", "Dart", "Scala", "Haskell", "Clojure", "F#"
     ]
 
-    # Delete all existing options
+    # Delete all existing options and vote events
+    Repo.delete_all(VoteEvent)
     Repo.delete_all(Option)
 
     # Pick 12-14 random languages
     num_languages = Enum.random(12..14)
     selected_languages = Enum.take_random(languages, num_languages)
 
-    # Insert languages with random votes between 10 and 39
-    Enum.each(selected_languages, fn lang ->
-      votes = Enum.random(10..39)
-      Repo.insert!(%Option{text: lang, votes: votes})
+    # Create options with 0 votes initially
+    options = Enum.map(selected_languages, fn lang ->
+      Repo.insert!(%Option{text: lang, votes: 0})
+    end)
+
+    # Backfill vote events over the last hour
+    now = DateTime.utc_now()
+    one_hour_ago = DateTime.add(now, -3600, :second)
+
+    # Target around 1000 total votes spread across all languages
+    total_target_votes = 1000
+    num_options = length(options)
+
+    # Distribute votes across languages with some variation
+    # Base votes per language, then add random variation
+    base_votes_per_lang = div(total_target_votes, num_options)
+
+    target_votes =
+      options
+      |> Enum.map(fn option ->
+        # Add variation: ±30% of base votes
+        variation = div(base_votes_per_lang * 30, 100)
+        votes = base_votes_per_lang + :rand.uniform(variation * 2) - variation
+        {option, max(votes, 10)} # Ensure at least 10 votes per language
+      end)
+      |> Map.new()
+
+    # Create vote events with completely random timestamps (like real-world data)
+    # Each vote happens at a random time within the last hour
+    vote_events =
+      Enum.flat_map(options, fn option ->
+        total_votes = Map.get(target_votes, option)
+
+        # Each vote gets a completely random timestamp within the hour
+        Enum.map(1..total_votes, fn vote_num ->
+          # Random timestamp anywhere in the last hour
+          seconds_ago = :rand.uniform(3600)
+          timestamp = DateTime.add(now, -seconds_ago, :second)
+
+          %{
+            option: option,
+            vote_number: vote_num,
+            timestamp: timestamp
+          }
+        end)
+      end)
+      # Sort by timestamp so votes happen in chronological order
+      |> Enum.sort_by(& &1.timestamp, DateTime)
+
+    # Insert vote events in chronological order
+    # Track cumulative votes for each option
+    initial_counts = Map.new(options, fn opt -> {opt.id, 0} end)
+
+    Enum.reduce(vote_events, initial_counts, fn event, vote_counts ->
+      option = event.option
+      current_count = Map.get(vote_counts, option.id)
+      new_count = current_count + 1
+
+      # Insert vote event with the timestamp
+      {:ok, vote_event} = Repo.insert(%VoteEvent{
+        option_id: option.id,
+        language: option.text,
+        votes_after: new_count,
+        event_type: "seed"
+      })
+
+      # Update the inserted_at timestamp to match our backfilled time
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "UPDATE vote_events SET inserted_at = $1 WHERE id = $2",
+        [event.timestamp, vote_event.id]
+      )
+
+      # Update vote count tracker
+      Map.put(vote_counts, option.id, new_count)
+    end)
+
+    # Update final vote counts on options
+    Enum.each(options, fn option ->
+      final_votes = Map.get(target_votes, option)
+      changeset = Ecto.Changeset.change(option, votes: final_votes)
+      Repo.update!(changeset)
     end)
 
     # Broadcast the update to all clients with seeded flag
@@ -165,13 +280,17 @@ defmodule LivePollWeb.PollLive do
       |> Enum.take(10)
 
     socket =
-      assign(socket,
+      socket
+      |> assign(
         options: options,
         sorted_options: sorted_options,
         total_votes: total_votes,
         recent_activity: recent_activity,
         last_minute_votes: socket.assigns.last_minute_votes + 1
       )
+      |> push_event("update-pie-chart", %{
+        data: Enum.map(sorted_options, fn opt -> %{name: opt.text, votes: opt.votes} end)
+      })
 
     {:noreply, socket}
   end
@@ -190,19 +309,19 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_info(:capture_trend, socket) do
-    # Capture current state for trend chart
-    now = DateTime.utc_now()
-    percentages = calculate_percentages(socket.assigns.options, socket.assigns.total_votes)
+    # Build trend data from vote events in the database using current time range
+    time_range = socket.assigns.time_range
+    trend_data = build_trend_data_from_events(time_range)
 
-    snapshot = %{
-      timestamp: now,
-      percentages: percentages
-    }
+    socket =
+      socket
+      |> assign(trend_data: trend_data)
+      |> push_event("update-trend-chart", %{
+        trendData: trend_data,
+        languages: Enum.map(socket.assigns.sorted_options, & &1.text)
+      })
 
-    # Keep last 60 snapshots (5 minutes)
-    trend_data = [snapshot | socket.assigns.trend_data] |> Enum.take(60)
-
-    {:noreply, assign(socket, trend_data: trend_data)}
+    {:noreply, socket}
   end
 
   def handle_info({:poll_reset, _data}, socket) do
@@ -211,12 +330,8 @@ defmodule LivePollWeb.PollLive do
     total_votes = 0
     sorted_options = Enum.sort_by(options, & &1.votes, :desc)
 
-    # Reset trend data
-    now = DateTime.utc_now()
-    initial_snapshot = %{
-      timestamp: now,
-      percentages: calculate_percentages(options, total_votes)
-    }
+    # Build trend data from vote events
+    trend_data = build_trend_data_from_events(5)
 
     socket =
       assign(socket,
@@ -226,7 +341,7 @@ defmodule LivePollWeb.PollLive do
         recent_activity: [],
         votes_per_minute: 0,
         last_minute_votes: 0,
-        trend_data: [initial_snapshot]
+        trend_data: trend_data
       )
 
     {:noreply, socket}
@@ -238,23 +353,27 @@ defmodule LivePollWeb.PollLive do
     total_votes = Enum.sum(Enum.map(options, & &1.votes))
     sorted_options = Enum.sort_by(options, & &1.votes, :desc)
 
-    # Initialize trend data with seeded values
-    now = DateTime.utc_now()
-    initial_snapshot = %{
-      timestamp: now,
-      percentages: calculate_percentages(options, total_votes)
-    }
+    # Build trend data from vote events
+    trend_data = build_trend_data_from_events(5)
 
     socket =
-      assign(socket,
+      socket
+      |> assign(
         options: options,
         sorted_options: sorted_options,
         total_votes: total_votes,
         recent_activity: [],
         votes_per_minute: 0,
         last_minute_votes: 0,
-        trend_data: [initial_snapshot]
+        trend_data: trend_data
       )
+      |> push_event("update-pie-chart", %{
+        data: Enum.map(sorted_options, fn opt -> %{name: opt.text, votes: opt.votes} end)
+      })
+      |> push_event("update-trend-chart", %{
+        trendData: trend_data,
+        languages: Enum.map(sorted_options, & &1.text)
+      })
 
     {:noreply, socket}
   end
@@ -327,6 +446,83 @@ defmodule LivePollWeb.PollLive do
         |> Enum.join(" ")
 
       points
+    end
+  end
+
+  # Helper function to build trend data from vote events
+  defp build_trend_data_from_events(minutes_back \\ 60) do
+    # Get events from the last N minutes (default: 60 minutes = 1 hour)
+    cutoff_time = DateTime.add(DateTime.utc_now(), -minutes_back * 60, :second)
+
+    events =
+      from(e in VoteEvent,
+        where: e.inserted_at >= ^cutoff_time,
+        order_by: [asc: e.inserted_at],
+        preload: :option
+      )
+      |> Repo.all()
+
+    # If no events, return current state
+    if events == [] do
+      options = Repo.all(Option)
+      total_votes = Enum.sum(Enum.map(options, & &1.votes))
+
+      [%{
+        timestamp: DateTime.utc_now(),
+        percentages: calculate_percentages(options, total_votes)
+      }]
+    else
+      # Dynamic bucket size and snapshot limit based on time range
+      {bucket_seconds, max_snapshots} = case minutes_back do
+        5 -> {5, 60}           # 5 minutes: 5-second buckets, 60 snapshots
+        60 -> {30, 120}        # 1 hour: 30-second buckets, 120 snapshots
+        720 -> {300, 144}      # 12 hours: 5-minute buckets, 144 snapshots
+        1440 -> {600, 144}     # 24 hours: 10-minute buckets, 144 snapshots
+        _ -> {30, 120}         # Default: 30-second buckets, 120 snapshots
+      end
+
+      # Group events into time buckets
+      events
+      |> Enum.group_by(fn event ->
+        # Round timestamp down to nearest bucket
+        timestamp = event.inserted_at
+        seconds = DateTime.to_unix(timestamp)
+        rounded_seconds = div(seconds, bucket_seconds) * bucket_seconds
+        DateTime.from_unix!(rounded_seconds)
+      end)
+      |> Enum.map(fn {bucket_time, bucket_events} ->
+        # Get the state at the end of this bucket
+        # Calculate vote totals for each language at this point in time
+        language_votes =
+          bucket_events
+          |> Enum.group_by(& &1.language)
+          |> Enum.map(fn {language, lang_events} ->
+            # Get the last event for this language in this bucket
+            last_event = Enum.max_by(lang_events, & &1.inserted_at)
+            {language, last_event.votes_after}
+          end)
+          |> Map.new()
+
+        total_votes = language_votes |> Map.values() |> Enum.sum()
+
+        percentages =
+          if total_votes > 0 do
+            language_votes
+            |> Enum.map(fn {lang, votes} ->
+              {lang, (votes / total_votes * 100) |> Float.round(1)}
+            end)
+            |> Map.new()
+          else
+            %{}
+          end
+
+        %{
+          timestamp: bucket_time,
+          percentages: percentages
+        }
+      end)
+      |> Enum.sort_by(& &1.timestamp, DateTime)
+      |> Enum.take(-max_snapshots) # Keep last N snapshots based on time range
     end
   end
 
