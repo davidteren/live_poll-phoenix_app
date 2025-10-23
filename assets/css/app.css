@@ -264,35 +264,115 @@ body {
 
 /* Language-specific progress bar colors */
 .progress-bar-fill[data-language="Elixir"] {
-  background: linear-gradient(90deg, #4e2a8e 0%, #6b46c1 100%);
+  background: linear-gradient(90deg, #9b59b6 0%, #b19cd9 100%);
 }
 
 .progress-bar-fill[data-language="Python"] {
-  background: linear-gradient(90deg, #3776ab 0%, #ffd43b 100%);
+  background: linear-gradient(90deg, #3498db 0%, #5dade2 100%);
 }
 
 .progress-bar-fill[data-language="JavaScript"] {
-  background: linear-gradient(90deg, #f0db4f 0%, #f7df1e 100%);
+  background: linear-gradient(90deg, #f1c40f 0%, #f4d03f 100%);
 }
 
 .progress-bar-fill[data-language="Ruby"] {
-  background: linear-gradient(90deg, #cc342d 0%, #e74c3c 100%);
+  background: linear-gradient(90deg, #e74c3c 0%, #ec7063 100%);
+}
+
+.progress-bar-fill[data-language="Go"] {
+  background: linear-gradient(90deg, #1abc9c 0%, #48c9b0 100%);
+}
+
+.progress-bar-fill[data-language="Rust"] {
+  background: linear-gradient(90deg, #e67e22 0%, #eb984e 100%);
+}
+
+.progress-bar-fill[data-language="TypeScript"] {
+  background: linear-gradient(90deg, #3498db 0%, #5dade2 100%);
+}
+
+.progress-bar-fill[data-language="Swift"] {
+  background: linear-gradient(90deg, #ff6b9d 0%, #ff85b3 100%);
+}
+
+.progress-bar-fill[data-language="Kotlin"] {
+  background: linear-gradient(90deg, #9b59b6 0%, #b19cd9 100%);
+}
+
+.progress-bar-fill[data-language="PHP"] {
+  background: linear-gradient(90deg, #2ecc71 0%, #58d68d 100%);
+}
+
+.progress-bar-fill[data-language="Java"] {
+  background: linear-gradient(90deg, #f39c12 0%, #f5b041 100%);
+}
+
+.progress-bar-fill[data-language="C#"] {
+  background: linear-gradient(90deg, #8e44ad 0%, #a569bd 100%);
+}
+
+.progress-bar-fill[data-language="C++"] {
+  background: linear-gradient(90deg, #16a085 0%, #45b39d 100%);
+}
+
+.progress-bar-fill[data-language="Dart"] {
+  background: linear-gradient(90deg, #34495e 0%, #5d6d7e 100%);
+}
+
+.progress-bar-fill[data-language="Scala"] {
+  background: linear-gradient(90deg, #c0392b 0%, #cd6155 100%);
+}
+
+.progress-bar-fill[data-language="Haskell"] {
+  background: linear-gradient(90deg, #d35400 0%, #dc7633 100%);
+}
+
+.progress-bar-fill[data-language="Clojure"] {
+  background: linear-gradient(90deg, #27ae60 0%, #52be80 100%);
+}
+
+.progress-bar-fill[data-language="F#"] {
+  background: linear-gradient(90deg, #2980b9 0%, #5499c7 100%);
 }
 
 [data-theme="dark"] .progress-bar-fill[data-language="Elixir"] {
-  background: linear-gradient(90deg, #6b46c1 0%, #8b5cf6 100%);
+  background: linear-gradient(90deg, #b19cd9 0%, #d2b4de 100%);
 }
 
 [data-theme="dark"] .progress-bar-fill[data-language="Python"] {
-  background: linear-gradient(90deg, #4b8bbe 0%, #ffe873 100%);
+  background: linear-gradient(90deg, #5dade2 0%, #85c1e9 100%);
 }
 
 [data-theme="dark"] .progress-bar-fill[data-language="JavaScript"] {
-  background: linear-gradient(90deg, #f7df1e 0%, #ffd700 100%);
+  background: linear-gradient(90deg, #f4d03f 0%, #f7dc6f 100%);
 }
 
 [data-theme="dark"] .progress-bar-fill[data-language="Ruby"] {
-  background: linear-gradient(90deg, #e74c3c 0%, #ff6b6b 100%);
+  background: linear-gradient(90deg, #ec7063 0%, #f1948a 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="Go"] {
+  background: linear-gradient(90deg, #48c9b0 0%, #76d7c4 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="Rust"] {
+  background: linear-gradient(90deg, #eb984e 0%, #f0b27a 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="TypeScript"] {
+  background: linear-gradient(90deg, #5dade2 0%, #85c1e9 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="Swift"] {
+  background: linear-gradient(90deg, #ff85b3 0%, #ffa3c7 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="Kotlin"] {
+  background: linear-gradient(90deg, #b19cd9 0%, #d2b4de 100%);
+}
+
+[data-theme="dark"] .progress-bar-fill[data-language="PHP"] {
+  background: linear-gradient(90deg, #58d68d 0%, #82e0aa 100%);
 }
 
 /* Typography refinements */
@@ -426,37 +506,149 @@ html {
   height: 300px;
 }
 
-/* Pie Chart Slice Colors - Language-specific */
+/* Pie Chart Slice Colors - Highly distinct palette with strong contrast */
 .chart-slice-elixir {
-  fill: #4e2a8e;
+  fill: #9b59b6; /* Purple */
 }
 
 .chart-slice-python {
-  fill: #3776ab;
+  fill: #3498db; /* Blue */
 }
 
 .chart-slice-javascript {
-  fill: #f0db4f;
+  fill: #f1c40f; /* Yellow */
 }
 
 .chart-slice-ruby {
-  fill: #cc342d;
+  fill: #e74c3c; /* Red */
+}
+
+.chart-slice-go {
+  fill: #1abc9c; /* Turquoise */
+}
+
+.chart-slice-rust {
+  fill: #e67e22; /* Orange */
+}
+
+.chart-slice-typescript {
+  fill: #3498db; /* Blue */
+}
+
+.chart-slice-swift {
+  fill: #ff6b9d; /* Pink */
+}
+
+.chart-slice-kotlin {
+  fill: #9b59b6; /* Purple */
+}
+
+.chart-slice-php {
+  fill: #2ecc71; /* Green */
+}
+
+.chart-slice-java {
+  fill: #f39c12; /* Dark Yellow/Orange */
+}
+
+.chart-slice-csharp {
+  fill: #8e44ad; /* Dark Purple */
+}
+
+.chart-slice-cplusplus {
+  fill: #16a085; /* Dark Turquoise */
+}
+
+.chart-slice-dart {
+  fill: #34495e; /* Dark Blue-Gray */
+}
+
+.chart-slice-scala {
+  fill: #c0392b; /* Dark Red */
+}
+
+.chart-slice-haskell {
+  fill: #d35400; /* Dark Orange */
+}
+
+.chart-slice-clojure {
+  fill: #27ae60; /* Dark Green */
+}
+
+.chart-slice-fsharp {
+  fill: #2980b9; /* Dark Blue */
 }
 
 [data-theme="dark"] .chart-slice-elixir {
-  fill: #6b46c1;
+  fill: #b19cd9; /* Lighter Purple */
 }
 
 [data-theme="dark"] .chart-slice-python {
-  fill: #4b8bbe;
+  fill: #5dade2; /* Lighter Blue */
 }
 
 [data-theme="dark"] .chart-slice-javascript {
-  fill: #f7df1e;
+  fill: #f4d03f; /* Lighter Yellow */
 }
 
 [data-theme="dark"] .chart-slice-ruby {
-  fill: #e74c3c;
+  fill: #ec7063; /* Lighter Red */
+}
+
+[data-theme="dark"] .chart-slice-go {
+  fill: #48c9b0; /* Lighter Turquoise */
+}
+
+[data-theme="dark"] .chart-slice-rust {
+  fill: #eb984e; /* Lighter Orange */
+}
+
+[data-theme="dark"] .chart-slice-typescript {
+  fill: #5dade2; /* Lighter Blue */
+}
+
+[data-theme="dark"] .chart-slice-swift {
+  fill: #ff85b3; /* Lighter Pink */
+}
+
+[data-theme="dark"] .chart-slice-kotlin {
+  fill: #b19cd9; /* Lighter Purple */
+}
+
+[data-theme="dark"] .chart-slice-php {
+  fill: #58d68d; /* Lighter Green */
+}
+
+[data-theme="dark"] .chart-slice-java {
+  fill: #f5b041; /* Lighter Dark Yellow/Orange */
+}
+
+[data-theme="dark"] .chart-slice-csharp {
+  fill: #a569bd; /* Lighter Dark Purple */
+}
+
+[data-theme="dark"] .chart-slice-cplusplus {
+  fill: #45b39d; /* Lighter Dark Turquoise */
+}
+
+[data-theme="dark"] .chart-slice-dart {
+  fill: #5d6d7e; /* Lighter Dark Blue-Gray */
+}
+
+[data-theme="dark"] .chart-slice-scala {
+  fill: #cd6155; /* Lighter Dark Red */
+}
+
+[data-theme="dark"] .chart-slice-haskell {
+  fill: #dc7633; /* Lighter Dark Orange */
+}
+
+[data-theme="dark"] .chart-slice-clojure {
+  fill: #52be80; /* Lighter Dark Green */
+}
+
+[data-theme="dark"] .chart-slice-fsharp {
+  fill: #5499c7; /* Lighter Dark Blue */
 }
 
 /* Bar Chart - Language-specific colors */
@@ -465,35 +657,319 @@ html {
 }
 
 .bar-chart-bar[data-language="Elixir"] {
-  background: linear-gradient(90deg, #4e2a8e 0%, #6b46c1 100%);
+  background: linear-gradient(90deg, #9b59b6 0%, #b19cd9 100%);
 }
 
 .bar-chart-bar[data-language="Python"] {
-  background: linear-gradient(90deg, #3776ab 0%, #ffd43b 100%);
+  background: linear-gradient(90deg, #3498db 0%, #5dade2 100%);
 }
 
 .bar-chart-bar[data-language="JavaScript"] {
-  background: linear-gradient(90deg, #f0db4f 0%, #f7df1e 100%);
+  background: linear-gradient(90deg, #f1c40f 0%, #f4d03f 100%);
 }
 
 .bar-chart-bar[data-language="Ruby"] {
-  background: linear-gradient(90deg, #cc342d 0%, #e74c3c 100%);
+  background: linear-gradient(90deg, #e74c3c 0%, #ec7063 100%);
+}
+
+.bar-chart-bar[data-language="Go"] {
+  background: linear-gradient(90deg, #1abc9c 0%, #48c9b0 100%);
+}
+
+.bar-chart-bar[data-language="Rust"] {
+  background: linear-gradient(90deg, #e67e22 0%, #eb984e 100%);
+}
+
+.bar-chart-bar[data-language="TypeScript"] {
+  background: linear-gradient(90deg, #3498db 0%, #5dade2 100%);
+}
+
+.bar-chart-bar[data-language="Swift"] {
+  background: linear-gradient(90deg, #ff6b9d 0%, #ff85b3 100%);
+}
+
+.bar-chart-bar[data-language="Kotlin"] {
+  background: linear-gradient(90deg, #9b59b6 0%, #b19cd9 100%);
+}
+
+.bar-chart-bar[data-language="PHP"] {
+  background: linear-gradient(90deg, #2ecc71 0%, #58d68d 100%);
 }
 
 [data-theme="dark"] .bar-chart-bar[data-language="Elixir"] {
-  background: linear-gradient(90deg, #6b46c1 0%, #8b5cf6 100%);
+  background: linear-gradient(90deg, #a78bfa 0%, #c4b5fd 100%);
 }
 
 [data-theme="dark"] .bar-chart-bar[data-language="Python"] {
-  background: linear-gradient(90deg, #4b8bbe 0%, #ffe873 100%);
+  background: linear-gradient(90deg, #38bdf8 0%, #7dd3fc 100%);
 }
 
 [data-theme="dark"] .bar-chart-bar[data-language="JavaScript"] {
-  background: linear-gradient(90deg, #f7df1e 0%, #ffd700 100%);
+  background: linear-gradient(90deg, #fde047 0%, #fef08a 100%);
 }
 
 [data-theme="dark"] .bar-chart-bar[data-language="Ruby"] {
-  background: linear-gradient(90deg, #e74c3c 0%, #ff6b6b 100%);
+  background: linear-gradient(90deg, #f87171 0%, #fca5a5 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="Go"] {
+  background: linear-gradient(90deg, #2dd4bf 0%, #5eead4 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="Rust"] {
+  background: linear-gradient(90deg, #fb923c 0%, #fdba74 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="TypeScript"] {
+  background: linear-gradient(90deg, #60a5fa 0%, #93c5fd 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="Swift"] {
+  background: linear-gradient(90deg, #f472b6 0%, #f9a8d4 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="Kotlin"] {
+  background: linear-gradient(90deg, #c084fc 0%, #d8b4fe 100%);
+}
+
+[data-theme="dark"] .bar-chart-bar[data-language="PHP"] {
+  background: linear-gradient(90deg, #34d399 0%, #6ee7b7 100%);
+}
+
+/* Legend text colors - Highly distinct palette */
+.legend-text-elixir {
+  color: #9b59b6;
+  font-weight: 600;
+}
+
+.legend-text-python {
+  color: #3498db;
+  font-weight: 600;
+}
+
+.legend-text-javascript {
+  color: #d4a017;
+  font-weight: 600;
+}
+
+.legend-text-ruby {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.legend-text-go {
+  color: #1abc9c;
+  font-weight: 600;
+}
+
+.legend-text-rust {
+  color: #e67e22;
+  font-weight: 600;
+}
+
+.legend-text-typescript {
+  color: #3498db;
+  font-weight: 600;
+}
+
+.legend-text-swift {
+  color: #ff6b9d;
+  font-weight: 600;
+}
+
+.legend-text-kotlin {
+  color: #9b59b6;
+  font-weight: 600;
+}
+
+.legend-text-php {
+  color: #2ecc71;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .legend-text-elixir {
+  color: #b19cd9;
+}
+
+[data-theme="dark"] .legend-text-python {
+  color: #5dade2;
+}
+
+[data-theme="dark"] .legend-text-javascript {
+  color: #f4d03f;
+}
+
+[data-theme="dark"] .legend-text-ruby {
+  color: #ec7063;
+}
+
+[data-theme="dark"] .legend-text-go {
+  color: #48c9b0;
+}
+
+[data-theme="dark"] .legend-text-rust {
+  color: #eb984e;
+}
+
+[data-theme="dark"] .legend-text-typescript {
+  color: #5dade2;
+}
+
+[data-theme="dark"] .legend-text-swift {
+  color: #ff85b3;
+}
+
+[data-theme="dark"] .legend-text-kotlin {
+  color: #b19cd9;
+}
+
+[data-theme="dark"] .legend-text-php {
+  color: #58d68d;
+}
+
+/* Trend Line Chart Colors */
+.trend-line-elixir {
+  stroke: #9b59b6;
+}
+
+.trend-line-python {
+  stroke: #3498db;
+}
+
+.trend-line-javascript {
+  stroke: #f1c40f;
+}
+
+.trend-line-ruby {
+  stroke: #e74c3c;
+}
+
+.trend-line-go {
+  stroke: #1abc9c;
+}
+
+.trend-line-rust {
+  stroke: #e67e22;
+}
+
+.trend-line-typescript {
+  stroke: #3498db;
+}
+
+.trend-line-swift {
+  stroke: #ff6b9d;
+}
+
+.trend-line-kotlin {
+  stroke: #9b59b6;
+}
+
+.trend-line-php {
+  stroke: #2ecc71;
+}
+
+.trend-line-java {
+  stroke: #f39c12;
+}
+
+.trend-line-csharp {
+  stroke: #8e44ad;
+}
+
+.trend-line-cplusplus {
+  stroke: #16a085;
+}
+
+.trend-line-dart {
+  stroke: #34495e;
+}
+
+.trend-line-scala {
+  stroke: #c0392b;
+}
+
+.trend-line-haskell {
+  stroke: #d35400;
+}
+
+.trend-line-clojure {
+  stroke: #27ae60;
+}
+
+.trend-line-fsharp {
+  stroke: #2980b9;
+}
+
+[data-theme="dark"] .trend-line-elixir {
+  stroke: #b19cd9;
+}
+
+[data-theme="dark"] .trend-line-python {
+  stroke: #5dade2;
+}
+
+[data-theme="dark"] .trend-line-javascript {
+  stroke: #f4d03f;
+}
+
+[data-theme="dark"] .trend-line-ruby {
+  stroke: #ec7063;
+}
+
+[data-theme="dark"] .trend-line-go {
+  stroke: #48c9b0;
+}
+
+[data-theme="dark"] .trend-line-rust {
+  stroke: #eb984e;
+}
+
+[data-theme="dark"] .trend-line-typescript {
+  stroke: #5dade2;
+}
+
+[data-theme="dark"] .trend-line-swift {
+  stroke: #ff85b3;
+}
+
+[data-theme="dark"] .trend-line-kotlin {
+  stroke: #b19cd9;
+}
+
+[data-theme="dark"] .trend-line-php {
+  stroke: #58d68d;
+}
+
+[data-theme="dark"] .trend-line-java {
+  stroke: #f5b041;
+}
+
+[data-theme="dark"] .trend-line-csharp {
+  stroke: #a569bd;
+}
+
+[data-theme="dark"] .trend-line-cplusplus {
+  stroke: #45b39d;
+}
+
+[data-theme="dark"] .trend-line-dart {
+  stroke: #5d6d7e;
+}
+
+[data-theme="dark"] .trend-line-scala {
+  stroke: #cd6155;
+}
+
+[data-theme="dark"] .trend-line-haskell {
+  stroke: #dc7633;
+}
+
+[data-theme="dark"] .trend-line-clojure {
+  stroke: #52be80;
+}
+
+[data-theme="dark"] .trend-line-fsharp {
+  stroke: #5499c7;
 }
 
 /* Activity Feed */

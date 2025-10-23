@@ -192,7 +192,13 @@ defmodule LivePollWeb.PollLiveTest do
       assert html =~ "stroke-width=\"40\""
     end
 
-    test "shows full circle when only one option has votes", %{conn: conn, options: [elixir | _]} do
+    test "shows full circle when only one option has votes", %{conn: conn, options: [elixir | _rest]} do
+      # Reset ALL options in database to 0 first
+      Repo.all(Option)
+      |> Enum.each(fn opt ->
+        Repo.update!(Ecto.Changeset.change(opt, votes: 0))
+      end)
+
       # Give only Elixir votes
       Repo.update!(Ecto.Changeset.change(elixir, votes: 100))
 
@@ -204,8 +210,10 @@ defmodule LivePollWeb.PollLiveTest do
       assert html =~ ~s(<path d="M 100 10 A 90 90)
       assert html =~ "chart-slice-elixir"
 
-      # Should only have ONE path element (for Elixir)
-      path_count = html |> String.split("<path") |> length() |> Kernel.-(1)
+      # Should only have ONE path element in the SVG (for Elixir)
+      # Count path elements within the SVG viewBox
+      svg_section = html |> String.split("viewBox=\"0 0 200 200\"") |> Enum.at(1) |> String.split("</svg>") |> Enum.at(0)
+      path_count = svg_section |> String.split("<path") |> length() |> Kernel.-(1)
       assert path_count == 1
     end
 

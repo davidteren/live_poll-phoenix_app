@@ -11,7 +11,28 @@
             <div class="w-1.5 h-1.5 rounded-full bg-lime-600 dark:bg-lime-400 live-indicator"></div>
             <span>Live</span>
           </div>
-          <button phx-click="reset_votes" class="reset-button px-3 py-1.5 rounded-lg transition-all">
+          <%!-- Theme Switcher --%>
+          <button
+            onclick="toggleTheme()"
+            class="inline-flex items-center justify-center rounded-lg px-2 py-1 text-xs font-medium transition-colors border border-zinc-950/10 dark:border-white/10 hover:bg-zinc-950/5 dark:hover:bg-white/5 text-zinc-950 dark:text-white"
+            title="Toggle theme"
+          >
+            <svg class="w-3.5 h-3.5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+            <svg class="w-3.5 h-3.5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </button>
+
+
+          <button phx-click="seed_data" class="px-2 py-1 text-xs rounded-lg transition-all bg-purple-600 hover:bg-purple-700 text-white font-medium border border-purple-700 dark:border-purple-500">
+            Seed Data
+          </button>
+
+          <button phx-click="reset_votes" class="px-2 py-1 text-xs rounded-lg
+          transition-all bg-orange-600 hover:bg-orange-700 text-white
+          font-medium border border-orange-700 dark:border-orange-500">
             Reset All
           </button>
         </div>
@@ -72,57 +93,92 @@
       <div class="lg:col-span-2 space-y-8">
         <div>
           <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Cast Your Vote</h2>
-          <div class="space-y-3">
-            <%= for option <- @options do %>
-              <div class="relative border border-zinc-950/10 dark:border-white/10 rounded-lg p-4 hover:border-zinc-950/20 dark:hover:border-white/20 transition-colors">
-                <div class="flex items-center justify-between mb-3">
-                  <div class="flex-1">
-                    <h3 class="text-base/6 font-medium text-zinc-950 dark:text-white">
-                      <%= option.text %>
-                    </h3>
-                    <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">
-                      <%= option.votes %> <%= if option.votes == 1, do: "vote", else: "votes" %> • <%= percentage(option.votes, @total_votes) %>%
-                    </p>
+
+          <%!-- Scrollable container with 2 columns --%>
+          <div class="max-h-[500px] overflow-y-auto pr-2 -mr-2 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <%= for option <- @options do %>
+                <div class="relative border border-zinc-950/10 dark:border-white/10 rounded-lg p-4 hover:border-zinc-950/20 dark:hover:border-white/20 transition-colors">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="flex-1 min-w-0">
+                      <h3 class="text-base/6 font-medium text-zinc-950 dark:text-white truncate">
+                        <%= option.text %>
+                      </h3>
+                      <p class="text-sm/6 text-zinc-500 dark:text-zinc-400">
+                        <%= option.votes %> <%= if option.votes == 1, do: "vote", else: "votes" %> • <%= percentage(option.votes, @total_votes) %>%
+                      </p>
+                    </div>
+                    <button
+                      phx-click="vote"
+                      phx-value-id={option.id}
+                      class="vote-button text-white font-semibold py-1 px-3 rounded-lg text-xs ml-3 flex-shrink-0"
+                    >
+                      Vote
+                    </button>
                   </div>
-                  <button
-                    phx-click="vote"
-                    phx-value-id={option.id}
-                    class="vote-button text-white font-semibold py-2 px-4 rounded-lg text-sm sm:text-xs/6"
-                  >
-                    Vote
-                  </button>
+                  <div class="progress-bar-bg w-full rounded-full h-2 overflow-hidden">
+                    <div
+                      class="progress-bar-fill h-2 rounded-full"
+                      data-language={option.text}
+                      style={"width: #{percentage(option.votes, @total_votes)}%"}
+                    ></div>
+                  </div>
                 </div>
-                <div class="progress-bar-bg w-full rounded-full h-2 overflow-hidden">
-                  <div
-                    class="progress-bar-fill h-2 rounded-full"
-                    data-language={option.text}
-                    style={"width: #{percentage(option.votes, @total_votes)}%"}
-                  ></div>
-                </div>
-              </div>
-            <% end %>
+              <% end %>
+            </div>
+          </div>
+
+          <%!-- Add Language Form --%>
+          <div class="border border-zinc-950/10 dark:border-white/10 rounded-lg p-4 bg-zinc-950/[0.02] dark:bg-white/[0.02]">
+            <h3 class="text-sm/6 font-medium text-zinc-950 dark:text-white mb-3">Add New Language</h3>
+            <form phx-submit="add_language" class="flex gap-2">
+              <input
+                type="text"
+                name="name"
+                placeholder="e.g., Kotlin, C#, PHP..."
+                class="flex-1 rounded-lg border border-zinc-950/10 dark:border-white/10 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-950 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                required
+              />
+              <button
+                type="submit"
+                class="px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium text-xs transition-colors flex-shrink-0"
+              >
+                Add
+              </button>
+            </form>
           </div>
         </div>
 
-        <%!-- Bar Chart --%>
+        <%!-- Trend Line Chart --%>
         <div>
-          <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Vote Distribution</h2>
-          <div class="space-y-4">
-            <%= for {option, index} <- Enum.with_index(@options) do %>
-              <div>
-                <div class="flex justify-between text-sm/6 mb-2">
-                  <span class="font-medium text-zinc-700 dark:text-zinc-300"><%= option.text %></span>
-                  <span class="font-semibold text-zinc-950 dark:text-white"><%= option.votes %></span>
-                </div>
-                <div class="h-8 bg-zinc-950/5 dark:bg-white/5 rounded-lg overflow-hidden">
-                  <div
-                    class="bar-chart-bar h-full rounded-lg flex items-center justify-end pr-3"
-                    data-language={option.text}
-                    style={"width: #{percentage(option.votes, @total_votes)}%"}
-                  >
-                    <span class="text-white text-xs font-bold"><%= percentage(option.votes, @total_votes) %>%</span>
-                  </div>
-                </div>
+          <h2 class="text-base/7 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white mb-4">Voting Trends</h2>
+          <div class="relative h-64 bg-zinc-950/5 dark:bg-white/5 rounded-lg p-4">
+            <%= if length(@trend_data) > 1 do %>
+              <svg viewBox="0 0 600 200" class="w-full h-full" preserveAspectRatio="none">
+                <%!-- Grid lines --%>
+                <line x1="0" y1="0" x2="600" y2="0" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
+                <line x1="0" y1="50" x2="600" y2="50" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
+                <line x1="0" y1="100" x2="600" y2="100" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
+                <line x1="0" y1="150" x2="600" y2="150" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
+                <line x1="0" y1="200" x2="600" y2="200" stroke="currentColor" stroke-width="0.5" class="text-zinc-300 dark:text-zinc-600" />
+
+                <%!-- Draw lines for each language --%>
+                <%= for option <- @sorted_options do %>
+                  <% language_class = language_to_class(option.text) %>
+                  <% points = trend_line_points(option.text, @trend_data) %>
+                  <%= if points != "" do %>
+                    <polyline
+                      points={points}
+                      fill="none"
+                      stroke-width="2"
+                      class={"trend-line-#{language_class}"}
+                    />
+                  <% end %>
+                <% end %>
+              </svg>
+            <% else %>
+              <div class="flex items-center justify-center h-full text-zinc-500 dark:text-zinc-400 text-sm">
+                Collecting trend data...
               </div>
             <% end %>
           </div>
@@ -148,13 +204,17 @@
                     stroke-width="40"
                     class="dark:stroke-zinc-700"
                   />
+                  <%!-- Center text for empty state --%>
+                  <text x="100" y="100" text-anchor="middle" dominant-baseline="middle" class="fill-zinc-500 dark:fill-zinc-400 text-sm font-medium">
+                    No votes
+                  </text>
                 <% else %>
-                  <%!-- Render pie slices using helper function --%>
-                  <%= for option <- @options do %>
+                  <%!-- Render pie slices using helper function - sorted by votes --%>
+                  <%= for option <- @sorted_options do %>
                     <%= if option.votes > 0 do %>
-                      <% language_class = String.downcase(option.text) %>
+                      <% language_class = language_to_class(option.text) %>
                       <path
-                        d={pie_slice_path(option, @options, @total_votes)}
+                        d={pie_slice_path(option, @sorted_options, @total_votes)}
                         class={"chart-slice-#{language_class}"}
                         stroke="white"
                         stroke-width="2"
@@ -165,13 +225,21 @@
               </svg>
             </div>
           </div>
-          <div class="mt-4 space-y-2">
-            <%= for option <- @options do %>
-              <% language_class = String.downcase(option.text) %>
+
+          <%!-- Legend with ranking, language names and colors - sorted by popularity --%>
+          <div class="mt-4 space-y-2 max-h-[200px] overflow-y-auto pr-2">
+            <%= for {option, index} <- Enum.with_index(@sorted_options) do %>
+              <% language_class = language_to_class(option.text) %>
+              <% rank = index + 1 %>
               <div class="flex items-center gap-2 text-sm/6">
-                <div class={"w-3 h-3 rounded-sm chart-slice-#{language_class}"}></div>
-                <span class="text-zinc-700 dark:text-zinc-300"><%= option.text %></span>
-                <span class="ml-auto font-semibold text-zinc-950 dark:text-white"><%= percentage(option.votes, @total_votes) %>%</span>
+                <%!-- Rank number --%>
+                <span class="text-zinc-500 dark:text-zinc-400 font-medium w-4 text-right flex-shrink-0"><%= rank %>.</span>
+                <%!-- Color indicator --%>
+                <div class={"w-3 h-3 rounded-sm chart-slice-#{language_class} flex-shrink-0"}></div>
+                <%!-- Language name with color --%>
+                <span class={"legend-text-#{language_class} truncate"}><%= option.text %></span>
+                <%!-- Percentage with color --%>
+                <span class={"ml-auto font-bold flex-shrink-0 legend-text-#{language_class}"}><%= percentage(option.votes, @total_votes) %>%</span>
               </div>
             <% end %>
           </div>
