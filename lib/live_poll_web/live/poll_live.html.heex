@@ -1,37 +1,38 @@
-<div class="max-w-2xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-  <div class="bg-white rounded-xl shadow-lg p-8">
-    <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">
-      What is your favorite programming language?
-    </h1>
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 sm:p-12">
+      <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-center mb-12 text-gray-900 dark:text-gray-100 leading-tight">
+        What is your favorite programming language?
+      </h1>
 
-    <div class="space-y-6">
-      <%= for option <- @options do %>
-        <div class="bg-gray-50 rounded-lg p-6 border border-gray-200 hover:shadow-md transition-shadow">
-          <div class="flex justify-between items-center mb-4">
-            <span class="text-xl font-semibold text-gray-700">{option.text}</span>
-            <button
-              phx-click="vote"
-              phx-value-id={option.id}
-              class="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 transform hover:scale-105"
-            >
-              Vote
-            </button>
-          </div>
-          <div class="text-lg text-gray-600 mb-3">
-            {option.votes} votes
-          </div>
-          <div class="w-full bg-gray-300 rounded-full h-6 overflow-hidden">
-            <div
-              class="bg-gradient-to-r from-indigo-500 to-purple-600 h-6 rounded-full transition-all duration-500 ease-out"
-              style={"width: #{percentage(option.votes, @total_votes)}%"}
-            >
+      <div class="grid gap-6 sm:gap-8">
+        <%= for option <- @options do %>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded-xl p-6 sm:p-8 border border-gray-200 dark:border-gray-600 hover:shadow-lg dark:hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+              <span class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-200"><%= option.text %></span>
+              <button
+                phx-click="vote"
+                phx-value-id={option.id}
+                class="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg"
+              >
+                Vote
+              </button>
+            </div>
+            <div class="text-lg text-gray-600 dark:text-gray-400 mb-4">
+              <%= option.votes %> votes
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-8 overflow-hidden shadow-inner">
+              <div
+                class="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-400 dark:to-indigo-500 h-8 rounded-full transition-all duration-700 ease-out shadow-sm"
+                style={"width: #{percentage(option.votes, @total_votes)}%"}
+              ></div>
+            </div>
+            <div class="text-right text-sm text-gray-500 dark:text-gray-400 mt-2 font-medium">
+              <%= percentage(option.votes, @total_votes) %>%
             </div>
           </div>
-          <div class="text-right text-sm text-gray-500 mt-1">
-            {percentage(option.votes, @total_votes)}%
-          </div>
-        </div>
-      <% end %>
+        <% end %>
+      </div>
     </div>
   </div>
 </div>
