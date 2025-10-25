@@ -10,10 +10,13 @@
 # We recommend using the bang functions (`insert!`, `update!`
 # and so on) as they will fail if something goes wrong.
 
-alias LivePoll.Repo
-alias LivePoll.Poll.Option
+alias LivePoll.Polls
 
-Repo.insert!(%Option{text: "Elixir", votes: 0})
-Repo.insert!(%Option{text: "Ruby", votes: 0})
-Repo.insert!(%Option{text: "Python", votes: 0})
-Repo.insert!(%Option{text: "JavaScript", votes: 0})
+# Use the Polls context to add languages with proper validation
+# This will prevent duplicates and normalize the language names
+{:ok, _} = Polls.add_language("Elixir")
+{:ok, _} = Polls.add_language("Ruby")
+{:ok, _} = Polls.add_language("Python")
+{:ok, _} = Polls.add_language("JavaScript")
+
+IO.puts("Seeded 4 programming languages successfully!")

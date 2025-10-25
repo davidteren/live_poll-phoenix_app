@@ -99,25 +99,39 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("add_language", %{"name" => name}, socket) when byte_size(name) > 0 do
-    # Check if language already exists
-    existing = Repo.get_by(Option, text: name)
+    case LivePoll.Polls.add_language(name) do
+      {:ok, option} ->
+        # Reload options to include the new one
+        options = Repo.all(Option) |> Enum.sort_by(& &1.id)
+        total_votes = Enum.sum(Enum.map(options, & &1.votes))
+        sorted_options = Enum.sort_by(options, & &1.votes, :desc)
 
-    if existing do
-      {:noreply, socket}
-    else
-      # Create new language option
-      %Option{}
-      |> Ecto.Changeset.change(text: name, votes: 0)
-      |> Repo.insert!()
+        {:noreply,
+         socket
+         |> assign(:options, options)
+         |> assign(:sorted_options, sorted_options)
+         |> assign(:total_votes, total_votes)
+         |> put_flash(:info, "Added #{option.text} to the poll!")}
 
-      # Broadcast update to all clients
-      Phoenix.PubSub.broadcast(
-        LivePoll.PubSub,
-        @topic,
-        {:language_added, %{name: name}}
-      )
+      {:error, message} when is_binary(message) ->
+        # Check if it's a duplicate error and provide helpful suggestions
+        if String.contains?(message, "already exists") do
+          similar = LivePoll.Polls.find_similar_languages(name)
 
-      {:noreply, socket}
+          suggestion =
+            if length(similar) > 0 do
+              similar_names = Enum.map(similar, & &1.text) |> Enum.join(", ")
+              " Did you mean: #{similar_names}?"
+            else
+              ""
+            end
+
+          {:noreply,
+           socket
+           |> put_flash(:error, "#{message}.#{suggestion}")}
+        else
+          {:noreply, put_flash(socket, :error, "Invalid input: #{message}")}
+        end
     end
   end
 
