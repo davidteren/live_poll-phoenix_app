@@ -50,17 +50,27 @@ defmodule LivePollWeb.RateLimitPlug do
   # Private functions
 
   defp get_client_ip(conn) do
-    # Try to get the real IP from X-Forwarded-For header (for proxies)
+    # Get trusted proxy IPs from application config
+    # In production, this should be configured to match your reverse proxy/load balancer
+    trusted_proxies = Application.get_env(:live_poll, :trusted_proxies, [])
+
+    # Check if the request is from a trusted proxy
+    is_from_trusted_proxy =
+      Enum.any?(trusted_proxies, fn proxy_ip ->
+        conn.remote_ip == proxy_ip
+      end)
+
+    # Only trust X-Forwarded-For header if request is from a trusted proxy
     case get_req_header(conn, "x-forwarded-for") do
-      [ip | _] ->
-        # Take the first IP in the chain
+      [ip | _] when is_from_trusted_proxy ->
+        # Take the first IP in the chain (the original client IP)
         ip
         |> String.split(",")
         |> List.first()
         |> String.trim()
 
-      [] ->
-        # Fall back to remote_ip
+      _ ->
+        # Fall back to remote_ip for all other cases
         conn.remote_ip
         |> Tuple.to_list()
         |> Enum.join(".")
