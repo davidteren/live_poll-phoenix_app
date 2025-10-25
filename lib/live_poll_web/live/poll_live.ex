@@ -47,21 +47,8 @@ defmodule LivePollWeb.PollLive do
   def handle_event("vote", %{"id" => id}, socket) do
     # Validate and parse ID first
     with {int_id, ""} <- Integer.parse(id),
-         # Atomic increment with RETURNING clause to prevent race conditions
-         {1, [updated_option]} <-
-           from(o in Option,
-             where: o.id == ^int_id,
-             select: o
-           )
-           |> Repo.update_all([inc: [votes: 1]], returning: true) do
-      # Create vote event with accurate count
-      Repo.insert!(%VoteEvent{
-        option_id: updated_option.id,
-        language: updated_option.text,
-        votes_after: updated_option.votes,
-        event_type: "vote"
-      })
-
+         # Wrap atomic increment and event creation in a transaction for consistency
+         {:ok, updated_option} <- vote_with_event(int_id) do
       # Broadcast update with accurate data
       Phoenix.PubSub.broadcast(
         LivePoll.PubSub,
@@ -80,6 +67,32 @@ defmodule LivePollWeb.PollLive do
       _ ->
         {:noreply, put_flash(socket, :error, "Invalid vote option")}
     end
+  end
+
+  # Private function to atomically increment vote and create event in a transaction
+  defp vote_with_event(option_id) do
+    Repo.transaction(fn ->
+      # Atomic increment with RETURNING clause to prevent race conditions
+      case from(o in Option,
+             where: o.id == ^option_id,
+             select: o
+           )
+           |> Repo.update_all([inc: [votes: 1]], returning: true) do
+        {1, [updated_option]} ->
+          # Create vote event with accurate count within the same transaction
+          Repo.insert!(%VoteEvent{
+            option_id: updated_option.id,
+            language: updated_option.text,
+            votes_after: updated_option.votes,
+            event_type: "vote"
+          })
+
+          updated_option
+
+        _ ->
+          Repo.rollback(:option_not_found)
+      end
+    end)
   end
 
   def handle_event("toggle_theme", _params, socket) do
