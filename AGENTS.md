@@ -4,6 +4,8 @@ This is a web application written using the Phoenix web framework.
 
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
+- **Always** implement proper error handling in LiveView event handlers - prefer non-bang functions and handle `{:ok, result}` | `{:error, changeset}` patterns with user feedback via flash messages
+- **Never** use raw SQL with `Ecto.Adapters.SQL.query!` when Ecto queries can accomplish the same task
 
 ### Phoenix v1.8 guidelines
 
@@ -15,8 +17,7 @@ This is a web application written using the Phoenix web framework.
 - Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module. You are **forbidden** from calling `<.flash_group>` outside of the `layouts.ex` module
 - Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar
 - **Always** use the imported `<.input>` component for form inputs from `core_components.ex` when available. `<.input>` is imported and using it will will save steps and prevent errors
-- If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
-custom classes must fully style the input
+- If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your custom classes must fully style the input
 
 ### JS and CSS guidelines
 
@@ -34,7 +35,9 @@ custom classes must fully style the input
 - Out of the box **only the app.js and app.css bundles are supported**
   - You cannot reference an external vendor'd script `src` or link `href` in the layouts
   - You must import the vendor deps into app.js and app.css to use them
-  - **Never write inline <script>custom js</script> tags within templates**
+  - **Never write inline <script>custom js</script> tags within templates or layouts** - move all JavaScript to `assets/js/` and import via `app.js`
+- **Always** escape user-provided content in JavaScript, especially in chart tooltips and dynamic content to prevent XSS attacks
+- **Remove unused dependencies** like DaisyUI if not actively used to reduce bundle size
 
 ### UI/UX & design guidelines
 
@@ -84,6 +87,8 @@ custom classes must fully style the input
 - Predicate function names should not start with `is_` and should end in a question mark. Names like `is_thing` should be reserved for guards
 - Elixir's builtin OTP primitives like `DynamicSupervisor` and `Registry`, require names in the child spec, such as `{DynamicSupervisor, name: MyApp.MyDynamicSup}`, then you can use `DynamicSupervisor.start_child(MyApp.MyDynamicSup, child_spec)`
 - Use `Task.async_stream(collection, callback, options)` for concurrent enumeration with back-pressure. The majority of times you will want to pass `timeout: :infinity` as option
+- **Always** use contexts to encapsulate business logic - never put complex business logic directly in LiveViews or controllers
+- **Extract complex calculations** (like trend analysis, data aggregation) into separate modules for testability and maintainability
 
 ## Mix guidelines
 
@@ -108,17 +113,50 @@ custom classes must fully style the input
   the UserLive route would point to the `AppWeb.Admin.UserLive` module
 
 - `Phoenix.View` no longer is needed or included with Phoenix, don't use it
+- **Always** implement rate limiting for public-facing actions (voting, form submissions) to prevent DoS attacks
+- **Add security headers** via plugs for production deployments (CSP, X-Frame-Options, etc.)
 <!-- phoenix:phoenix-end -->
 
 <!-- phoenix:ecto-start -->
 ## Ecto Guidelines
 
 - **Always** preload Ecto associations in queries when they'll be accessed in templates, ie a message that needs to reference the `message.user.email`
+- **However**, avoid unnecessary preloads that won't be used - they add overhead
 - Remember `import Ecto.Query` and other supporting modules when you write `seeds.exs`
 - `Ecto.Schema` fields always use the `:string` type, even for `:text`, columns, ie: `field :name, :string`
 - `Ecto.Changeset.validate_number/2` **DOES NOT SUPPORT the `:allow_nil` option**. By default, Ecto validations only run if a change for the given field exists and the change value is not nil, so such as option is never needed
 - You **must** use `Ecto.Changeset.get_field(changeset, :field)` to access changeset fields
 - Fields which are set programatically, such as `user_id`, must not be listed in `cast` calls or similar for security purposes. Instead they must be explicitly set when creating the struct
+- **Always** add unique constraints at both the database and changeset level for fields that must be unique:
+  
+      # Migration
+      create unique_index(:table_name, [:field_name])
+      
+      # Changeset
+      |> unique_constraint(:field_name)
+
+- **Use atomic operations** to prevent race conditions in concurrent updates:
+
+      # WRONG - Race condition with read-modify-write
+      record = Repo.get!(Model, id)
+      Repo.update(Ecto.Changeset.change(record, counter: record.counter + 1))
+      
+      # CORRECT - Atomic increment
+      from(m in Model, where: m.id == ^id)
+      |> Repo.update_all([inc: [counter: 1]], returning: true)
+
+- **Use batch operations** for bulk inserts/updates to improve performance:
+
+      # Use Repo.insert_all for bulk inserts
+      Repo.insert_all(Model, records, on_conflict: :nothing)
+      
+      # Wrap large operations in transactions
+      Repo.transaction(fn ->
+        # batch operations here
+      end)
+
+- **Implement data retention policies** for time-series or log data to prevent unbounded growth
+- **Add appropriate database indexes** for frequently queried columns, especially for time-based queries and foreign keys
 <!-- phoenix:ecto-end -->
 
 <!-- phoenix:html-start -->
@@ -208,6 +246,8 @@ custom classes must fully style the input
 - LiveViews should be named like `AppWeb.WeatherLive`, with a `Live` suffix. When you go to add LiveView routes to the router, the default `:browser` scope is **already aliased** with the `AppWeb` module, so you can just do `live "/weather", WeatherLive`
 - Remember anytime you use `phx-hook="MyHook"` and that js hook manages its own DOM, you **must** also set the `phx-update="ignore"` attribute
 - **Never** write embedded `<script>` tags in HEEx. Instead always write your scripts and hooks in the `assets/js` directory and integrate them with the `assets/js/app.js` file
+- **Keep LiveView modules focused on UI concerns** - extract business logic to context modules
+- **Limit LiveView module size** - if a LiveView exceeds 200-300 lines, consider extracting logic to separate modules
 
 ### LiveView streams
 
@@ -251,6 +291,27 @@ custom classes must fully style the input
 
 - **Never** use the deprecated `phx-update="append"` or `phx-update="prepend"` for collections
 
+### LiveView Performance
+
+- **Implement caching strategies** for frequently accessed data using ETS or external caching solutions
+- **Use database aggregation** instead of loading all records into memory for calculations
+- **Limit the amount of data in socket assigns** - large assigns are serialized on every update
+- **Schedule background tasks** with `Process.send_after` instead of `:timer.send_interval` for better lifecycle management:
+
+      def mount(_params, _session, socket) do
+        if connected?(socket), do: schedule_update()
+        {:ok, socket}
+      end
+      
+      defp schedule_update do
+        Process.send_after(self(), :update_stats, 5000)
+      end
+      
+      def handle_info(:update_stats, socket) do
+        schedule_update()
+        {:noreply, update_stats(socket)}
+      end
+
 ### LiveView tests
 
 - `Phoenix.LiveViewTest` module and `LazyHTML` (included) for making your assertions
@@ -267,6 +328,19 @@ custom classes must fully style the input
       document = LazyHTML.from_fragment(html)
       matches = LazyHTML.filter(document, "your-complex-selector")
       IO.inspect(matches, label: "Matches")
+
+- **Always test for race conditions** in concurrent operations:
+
+      test "handles concurrent votes without losing updates" do
+        tasks = for _ <- 1..100 do
+          Task.async(fn -> vote_for_option(option_id) end)
+        end
+        
+        Task.await_many(tasks)
+        assert final_count == 100
+      end
+
+- **Never use `:timer.sleep`** for async operations, use `assert_receive` or similar patterns
 
 ### Form handling
 
@@ -329,6 +403,25 @@ And **never** do this:
 
 - You are FORBIDDEN from accessing the changeset in the template as it will cause errors
 - **Never** use `<.form let={f} ...>` in the template, instead **always use `<.form for={@form} ...>`**, then drive all form references from the form assign as in `@form[:field]`. The UI should **always** be driven by a `to_form/2` assigned in the LiveView module that is derived from a changeset
+
+### Input Validation and Security
+
+- **Always validate and sanitize user input** to prevent XSS and injection attacks:
+
+      def validate_input(name) do
+        name
+        |> String.trim()
+        |> String.slice(0, 50)  # Limit length
+        |> validate_format(~r/^[a-zA-Z0-9\s\#\+\-\.]+$/)  # Allowed characters only
+      end
+
+- **Implement input validation at multiple levels**:
+  1. Client-side validation (for UX)
+  2. LiveView validation (for immediate feedback)
+  3. Changeset validation (for data integrity)
+  4. Database constraints (for final safety)
+
+- **Always handle validation errors gracefully** with user-friendly messages
 <!-- phoenix:liveview-end -->
 
 <!-- usage-rules-end -->
