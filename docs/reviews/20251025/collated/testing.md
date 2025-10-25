@@ -8,6 +8,68 @@
 - **Integration Tests:** None
 - **Performance Tests:** None
 - **Security Tests:** None
+- **Concurrency Tests:** None
+
+## Critical Testing Gaps
+
+### 1. Race Condition Testing
+**Priority:** CRITICAL  
+**Issue:** No tests for concurrent voting leading to lost updates
+
+```elixir
+defmodule LivePoll.ConcurrencyTest do
+  use LivePoll.DataCase
+  
+  @tag :critical
+  test "handles concurrent votes without losing updates" do
+    option = option_fixture(votes: 0)
+    
+    # Simulate 100 concurrent votes
+    tasks = for _ <- 1..100 do
+      Task.async(fn -> 
+        Polls.cast_vote(option.id)
+      end)
+    end
+    
+    results = Task.await_many(tasks, 5000)
+    
+    # All votes should succeed
+    assert Enum.all?(results, fn {:ok, _} -> true; _ -> false end)
+    
+    # Final count should be exactly 100
+    updated = Polls.get_option!(option.id)
+    assert updated.votes == 100
+  end
+  
+  @tag :critical
+  test "atomic increments prevent race conditions" do
+    option = option_fixture(votes: 0)
+    
+    # Run votes in parallel processes
+    parent = self()
+    
+    for _ <- 1..50 do
+      spawn(fn ->
+        {:ok, result} = Polls.cast_vote(option.id)
+        send(parent, {:voted, result.votes})
+      end)
+    end
+    
+    # Collect all vote counts
+    counts = for _ <- 1..50 do
+      receive do
+        {:voted, count} -> count
+      after
+        1000 -> flunk("Timeout waiting for vote")
+      end
+    end
+    
+    # Each count should be unique (no duplicates from race conditions)
+    assert length(Enum.uniq(counts)) == 50
+    assert Enum.max(counts) == 50
+  end
+end
+```
 
 ## Test Quality Issues
 
@@ -19,11 +81,8 @@
 view |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
 :timer.sleep(100)  # BAD: Flaky test
 assert render(view) =~ "1 vote"
-```
 
-**Solution:**
-```elixir
-# Use proper synchronization
+# Solution: Use proper synchronization
 view |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
 assert_receive {:vote_cast, _}, 1000
 assert render(view) =~ "1 vote"
@@ -68,6 +127,7 @@ assert html |> Floki.find("[data-testid='elixir-percentage']") |> Floki.text() =
 - Percentage calculations
 - Event aggregation
 - Seeding logic
+- Atomic updates
 
 **Required Tests:**
 ```elixir
@@ -77,43 +137,61 @@ defmodule LivePoll.PollsTest do
   alias LivePoll.Polls
   
   describe "cast_vote/1" do
-    test "increments vote count" do
+    test "increments vote count atomically" do
       option = option_fixture()
       assert {:ok, updated} = Polls.cast_vote(option.id)
       assert updated.votes == option.votes + 1
     end
     
-    test "creates vote event" do
+    test "creates vote event with correct data" do
       option = option_fixture()
-      assert {:ok, _} = Polls.cast_vote(option.id)
+      assert {:ok, result} = Polls.cast_vote(option.id)
       
       events = Polls.list_vote_events(option.id)
       assert length(events) == 1
       assert hd(events).event_type == "vote"
+      assert hd(events).votes_after == result.votes
     end
     
-    test "handles concurrent votes correctly" do
-      option = option_fixture()
-      
-      tasks = for _ <- 1..10 do
-        Task.async(fn -> Polls.cast_vote(option.id) end)
-      end
-      
-      Task.await_many(tasks)
-      
-      updated = Polls.get_option!(option.id)
-      assert updated.votes == 10
+    test "handles invalid option ID gracefully" do
+      assert {:error, :not_found} = Polls.cast_vote(-1)
+    end
+  end
+  
+  describe "add_language/1" do
+    test "creates new option with valid name" do
+      assert {:ok, option} = Polls.add_language("Rust")
+      assert option.text == "Rust"
+      assert option.votes == 0
+    end
+    
+    test "rejects duplicate language names" do
+      {:ok, _} = Polls.add_language("Go")
+      assert {:error, changeset} = Polls.add_language("Go")
+      assert {:text, {"has already been taken", _}} in changeset.errors
+    end
+    
+    test "validates language name format" do
+      assert {:error, _} = Polls.add_language("<script>alert('xss')</script>")
+      assert {:error, _} = Polls.add_language(String.duplicate("a", 51))
+      assert {:error, _} = Polls.add_language("")
     end
   end
   
   describe "calculate_trends/1" do
     test "aggregates votes by time bucket" do
-      # Setup test data
-      create_vote_events_over_time()
+      # Setup test data over time
+      option = option_fixture()
+      
+      for i <- 1..10 do
+        {:ok, _} = Polls.cast_vote_at(option.id, 
+          DateTime.add(DateTime.utc_now(), -i * 60))
+      end
       
       trends = Polls.calculate_trends(60)
       
-      assert length(trends) == 120  # 60 minutes / 30 second buckets
+      assert length(trends) > 0
+      assert Enum.all?(trends, &Map.has_key?(&1, :timestamp))
       assert Enum.all?(trends, &Map.has_key?(&1, :percentages))
     end
     
@@ -130,6 +208,57 @@ defmodule LivePoll.PollsTest do
       
       assert length(trends_5min) < length(trends_60min)
     end
+    
+    test "carries forward state between buckets" do
+      option = option_fixture(votes: 5)
+      
+      # Create gap in events
+      {:ok, _} = Polls.cast_vote_at(option.id, 
+        DateTime.add(DateTime.utc_now(), -300))
+      {:ok, _} = Polls.cast_vote_at(option.id, 
+        DateTime.add(DateTime.utc_now(), -60))
+      
+      trends = Polls.calculate_trends(10)
+      
+      # Should have consistent values during gap
+      assert Enum.all?(trends, fn t -> 
+        Map.get(t.percentages, option.text, 0) > 0
+      end)
+    end
+  end
+  
+  describe "seed_votes/1" do
+    test "creates specified number of events" do
+      options = for i <- 1..5, do: option_fixture(text: "Lang#{i}")
+      
+      assert :ok = Polls.seed_votes(100)
+      
+      total_events = Repo.aggregate(VoteEvent, :count)
+      assert total_events == 100
+    end
+    
+    test "uses batch inserts for performance" do
+      options = for i <- 1..5, do: option_fixture(text: "Lang#{i}")
+      
+      {time, :ok} = :timer.tc(fn -> Polls.seed_votes(1000) end)
+      
+      # Should complete in under 2 seconds
+      assert time < 2_000_000
+    end
+    
+    test "distributes votes according to weights" do
+      option1 = option_fixture(text: "Popular", weight: 100)
+      option2 = option_fixture(text: "Unpopular", weight: 10)
+      
+      Polls.seed_votes(1000)
+      
+      updated1 = Polls.get_option!(option1.id)
+      updated2 = Polls.get_option!(option2.id)
+      
+      # Popular should have roughly 10x more votes
+      ratio = updated1.votes / max(updated2.votes, 1)
+      assert ratio > 5 && ratio < 15
+    end
   end
 end
 ```
@@ -145,6 +274,7 @@ end
 ```elixir
 defmodule LivePollWeb.IntegrationTest do
   use LivePollWeb.ConnCase
+  import Phoenix.LiveViewTest
   
   @tag :integration
   test "complete voting flow with multiple clients", %{conn: conn} do
@@ -157,7 +287,7 @@ defmodule LivePollWeb.IntegrationTest do
     |> element("[data-testid='vote-elixir']")
     |> render_click()
     
-    # Assertions
+    # Assertions - both views should update
     assert_push_event(view1, "update-pie-chart", %{data: data})
     assert_push_event(view2, "update-pie-chart", %{data: ^data})
     
@@ -168,6 +298,54 @@ defmodule LivePollWeb.IntegrationTest do
     # Verify vote event created
     events = Repo.all(VoteEvent)
     assert length(events) == 1
+    assert hd(events).option_id == option.id
+  end
+  
+  @tag :integration
+  test "handles rapid voting from multiple clients", %{conn: conn} do
+    views = for _ <- 1..10 do
+      {:ok, view, _} = live(build_conn(), "/")
+      view
+    end
+    
+    # Each view votes once
+    tasks = Enum.map(views, fn view ->
+      Task.async(fn ->
+        view
+        |> element("[data-testid='vote-python']")
+        |> render_click()
+      end)
+    end)
+    
+    Task.await_many(tasks, 5000)
+    
+    # Verify all votes counted
+    option = Repo.get_by!(Option, text: "Python")
+    assert option.votes == 10
+  end
+  
+  @tag :integration
+  test "reset votes updates all connected clients", %{conn: conn} do
+    {:ok, admin_view, _} = live(conn, "/")
+    {:ok, user_view, _} = live(build_conn(), "/")
+    
+    # Vote first
+    admin_view
+    |> element("[data-testid='vote-javascript']")
+    |> render_click()
+    
+    # Reset
+    admin_view
+    |> element("[data-testid='reset-votes']")
+    |> render_click()
+    
+    # Both views should show zero votes
+    assert render(admin_view) =~ "0 votes"
+    assert render(user_view) =~ "0 votes"
+    
+    # Database should be clean
+    assert Repo.aggregate(VoteEvent, :count) == 0
+    assert Repo.all(Option) |> Enum.all?(&(&1.votes == 0))
   end
 end
 ```
@@ -185,19 +363,23 @@ defmodule LivePoll.PerformanceTest do
   use LivePoll.DataCase
   
   @tag :performance
+  @tag timeout: 60_000
   test "handles 100 concurrent votes efficiently" do
     option = option_fixture()
     
-    {time, _} = :timer.tc(fn ->
+    {time, results} = :timer.tc(fn ->
       1..100
       |> Task.async_stream(fn _ ->
         Polls.cast_vote(option.id)
-      end, max_concurrency: 100)
-      |> Stream.run()
+      end, max_concurrency: 100, timeout: 5000)
+      |> Enum.to_list()
     end)
     
     # Should complete in under 1 second
     assert time < 1_000_000
+    
+    # All votes should succeed
+    assert Enum.all?(results, fn {:ok, {:ok, _}} -> true; _ -> false end)
     
     # Verify all votes counted
     updated = Polls.get_option!(option.id)
@@ -223,6 +405,42 @@ defmodule LivePoll.PerformanceTest do
     assert t2 / t1 < 15  # Should be ~10x
     assert t3 / t2 < 15  # Should be ~10x
   end
+  
+  @tag :performance
+  test "seeding with batch inserts is fast" do
+    options = for i <- 1..10, do: option_fixture(text: "Lang#{i}")
+    
+    {time, :ok} = :timer.tc(fn ->
+      Polls.seed_votes(10_000)
+    end)
+    
+    # Should complete in under 2 seconds
+    assert time < 2_000_000
+    
+    # Verify events created
+    assert Repo.aggregate(VoteEvent, :count) == 10_000
+  end
+  
+  @tag :performance
+  test "memory usage remains bounded" do
+    # Get initial memory
+    :erlang.garbage_collect()
+    initial_memory = :erlang.memory(:processes)
+    
+    # Perform operations
+    for _ <- 1..1000 do
+      option = Enum.random(1..10)
+      Polls.cast_vote(option)
+    end
+    
+    # Force GC and check memory
+    :erlang.garbage_collect()
+    final_memory = :erlang.memory(:processes)
+    
+    # Memory increase should be reasonable (< 10MB)
+    increase = final_memory - initial_memory
+    assert increase < 10_000_000
+  end
 end
 ```
 
@@ -241,7 +459,7 @@ defmodule LivePoll.PropertyTest do
       
       option = create_option(votes: initial_votes)
       
-      final_votes = Enum.reduce(vote_increments, initial_votes, fn increment, acc ->
+      final_votes = Enum.reduce(vote_increments, initial_votes, fn _increment, acc ->
         {:ok, updated} = Polls.cast_vote(option.id)
         assert updated.votes >= acc
         updated.votes
@@ -264,6 +482,35 @@ defmodule LivePoll.PropertyTest do
       assert abs(total - 100.0) < 0.1
     end
   end
+  
+  property "unique constraint prevents duplicates" do
+    check all names <- list_of(string(:alphanumeric, min_length: 1, max_length: 50), 
+                                min_length: 1, max_length: 20) do
+      
+      unique_names = Enum.uniq(names)
+      
+      results = Enum.map(unique_names, fn name ->
+        Polls.add_language(name)
+      end)
+      
+      # First insertion of each unique name should succeed
+      assert Enum.all?(results, fn
+        {:ok, _} -> true
+        {:error, _} -> false
+      end)
+      
+      # Second insertion should fail
+      duplicate_results = Enum.map(unique_names, fn name ->
+        Polls.add_language(name)
+      end)
+      
+      assert Enum.all?(duplicate_results, fn
+        {:error, changeset} -> 
+          {:text, {"has already been taken", _}} in changeset.errors
+        _ -> false
+      end)
+    end
+  end
 end
 ```
 
@@ -273,11 +520,13 @@ end
 - XSS prevention
 - CSRF protection
 - Rate limiting
+- Input validation
 
 **Required Tests:**
 ```elixir
 defmodule LivePollWeb.SecurityTest do
   use LivePollWeb.ConnCase
+  import Phoenix.LiveViewTest
   
   describe "SQL injection prevention" do
     test "handles malicious option IDs safely", %{conn: conn} do
@@ -285,11 +534,11 @@ defmodule LivePollWeb.SecurityTest do
       
       malicious_id = "1; DROP TABLE poll_options;--"
       
-      assert_raise Ecto.Query.CastError, fn ->
-        view
+      # Should not crash or execute SQL
+      assert {:error, _} = view
         |> element("button[phx-value-id='#{malicious_id}']")
         |> render_click()
-      end
+        |> catch_error()
       
       # Verify tables still exist
       assert Repo.all(Option) |> is_list()
@@ -303,19 +552,66 @@ defmodule LivePollWeb.SecurityTest do
       malicious_name = "<script>alert('XSS')</script>"
       
       view
-      |> element("form")
-      |> render_submit(%{name: malicious_name})
+      |> form("#language-form", %{name: malicious_name})
+      |> render_submit()
       
       html = render(view)
       refute html =~ "<script>"
-      assert html =~ "&lt;script&gt;"
+      assert html =~ "&lt;script&gt;" or html =~ "Invalid"
+    end
+    
+    test "escapes content in chart tooltips" do
+      option = option_fixture(text: "<img src=x onerror=alert('XSS')>")
+      
+      # Render chart data
+      data = Polls.get_chart_data()
+      json = Jason.encode!(data)
+      
+      # Should be escaped
+      refute json =~ "<img"
+      assert json =~ "\\u003cimg" or json =~ "&lt;img"
     end
   end
   
   describe "rate limiting" do
     @tag :pending
-    test "prevents rapid voting from same client" do
-      # This test would require rate limiting implementation
+    test "prevents rapid voting from same client", %{conn: conn} do
+      {:ok, view, _} = live(conn, "/")
+      
+      # First 10 votes should succeed
+      for _ <- 1..10 do
+        view
+        |> element("[data-testid='vote-elixir']")
+        |> render_click()
+      end
+      
+      # 11th vote should be rate limited
+      result = view
+        |> element("[data-testid='vote-elixir']")
+        |> render_click()
+      
+      assert result =~ "Too many votes"
+    end
+  end
+  
+  describe "input validation" do
+    test "rejects invalid language names" do
+      invalid_names = [
+        "",  # Empty
+        String.duplicate("a", 51),  # Too long
+        "!!!",  # Invalid characters
+        "'; DROP TABLE options; --"  # SQL injection attempt
+      ]
+      
+      for name <- invalid_names do
+        assert {:error, _} = Polls.add_language(name)
+      end
+    end
+    
+    test "validates vote option IDs" do
+      assert {:error, :not_found} = Polls.cast_vote(-1)
+      assert {:error, :not_found} = Polls.cast_vote(999999)
+      assert {:error, :invalid_id} = Polls.cast_vote("not_a_number")
     end
   end
 end
@@ -353,6 +649,17 @@ defmodule LivePoll.Factory do
     |> insert()
     |> create_vote_events(count)
   end
+  
+  def create_vote_events(option, count) do
+    for i <- 1..count do
+      insert(:vote_event, 
+        option: option,
+        votes_after: i,
+        inserted_at: DateTime.add(DateTime.utc_now(), -i * 60)
+      )
+    end
+    option
+  end
 end
 ```
 
@@ -388,6 +695,12 @@ defmodule LivePollWeb.TestHelpers do
       timeout -> flunk("Update timeout")
     end
   end
+  
+  def setup_test_options(count \\ 5) do
+    for i <- 1..count do
+      Factory.insert(:option, text: "Option#{i}", votes: i * 10)
+    end
+  end
 end
 ```
 
@@ -412,6 +725,11 @@ config :live_poll,
 
 # Disable animations in tests
 config :live_poll, :animations, false
+
+# Use synchronous PubSub for tests
+config :live_poll, LivePoll.PubSub,
+  adapter: Phoenix.PubSub.PG2,
+  pool_size: 1
 ```
 
 ## Code Quality Tools
@@ -425,7 +743,10 @@ defp deps do
     {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
     {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
     {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
-    {:doctor, "~> 0.21", only: :dev, runtime: false}
+    {:doctor, "~> 0.21", only: :dev, runtime: false},
+    {:ex_machina, "~> 2.7", only: :test},
+    {:floki, "~> 0.35", only: :test},
+    {:stream_data, "~> 1.0", only: [:dev, :test]}
   ]
 end
 ```
@@ -441,7 +762,8 @@ def project do
       coveralls: :test,
       "coveralls.detail": :test,
       "coveralls.post": :test,
-      "coveralls.html": :test
+      "coveralls.html": :test,
+      "coveralls.github": :test
     ]
   ]
 end
@@ -502,7 +824,7 @@ jobs:
       run: |
         mix ecto.create
         mix ecto.migrate
-        mix test
+        mix test --trace
     
     - name: Check code quality
       run: |
@@ -514,6 +836,11 @@ jobs:
       env:
         MIX_ENV: test
       run: mix coveralls.github
+    
+    - name: Run performance tests
+      env:
+        MIX_ENV: test
+      run: mix test --only performance
 ```
 
 ## Test Execution Strategy
@@ -525,21 +852,30 @@ test/
 │   ├── polls/
 │   │   ├── option_test.exs
 │   │   ├── vote_event_test.exs
-│   │   └── trend_calculator_test.exs
+│   │   ├── trend_calculator_test.exs
+│   │   └── vote_service_test.exs
 │   └── stats/
 │       └── aggregator_test.exs
 ├── integration/
 │   ├── voting_flow_test.exs
-│   └── real_time_updates_test.exs
+│   ├── real_time_updates_test.exs
+│   └── pubsub_test.exs
 ├── live/
 │   └── poll_live_test.exs
 ├── performance/
-│   └── load_test.exs
+│   ├── load_test.exs
+│   └── memory_test.exs
+├── security/
+│   ├── injection_test.exs
+│   └── validation_test.exs
+├── property/
+│   └── invariants_test.exs
 └── support/
     ├── channel_case.ex
     ├── conn_case.ex
     ├── data_case.ex
-    └── factories.ex
+    ├── factories.ex
+    └── test_helpers.ex
 ```
 
 ### 2. Test Execution Tags
@@ -553,8 +889,17 @@ mix test --only integration
 # Run performance tests
 mix test --only performance
 
+# Run security tests
+mix test --only security
+
+# Run critical tests
+mix test --only critical
+
 # Exclude slow tests in CI
 mix test --exclude slow
+
+# Run with coverage
+mix coveralls.html
 ```
 
 ### 3. Test Database Management
@@ -563,15 +908,37 @@ mix test --exclude slow
 defmodule LivePoll.DataCase do
   use ExUnit.CaseTemplate
   
+  using do
+    quote do
+      alias LivePoll.Repo
+      
+      import Ecto
+      import Ecto.Changeset
+      import Ecto.Query
+      import LivePoll.DataCase
+      import LivePoll.Factory
+    end
+  end
+  
   setup tags do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(LivePoll.Repo, shared: not tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(
+      LivePoll.Repo, 
+      shared: not tags[:async]
+    )
+    
+    on_exit(fn -> 
+      Ecto.Adapters.SQL.Sandbox.stop_owner(pid) 
+    end)
+    
     :ok
   end
   
   def create_test_data(count \\ 4) do
     for i <- 1..count do
-      LivePoll.Factory.insert(:option, text: "Option #{i}", votes: i * 10)
+      LivePoll.Factory.insert(:option, 
+        text: "Option #{i}", 
+        votes: i * 10
+      )
     end
   end
 end
@@ -583,9 +950,10 @@ end
 - **Code Coverage:** >80% (currently ~25%)
 - **Credo Issues:** 0 (currently unknown)
 - **Dialyzer Warnings:** 0 (currently unknown)
-- **Security Issues:** 0 (currently unknown)
+- **Security Issues:** 0 (currently multiple)
 - **Test Execution Time:** <30 seconds for unit tests
 - **Cyclomatic Complexity:** <10 per function
+- **Test Flakiness:** 0% (no timing-dependent tests)
 
 ### Quality Gates
 ```elixir
@@ -599,11 +967,41 @@ defp aliases do
       "sobelow --config",
       "dialyzer",
       "test --cover --warnings-as-errors"
+    ],
+    "test.all": [
+      "test --only unit",
+      "test --only integration",
+      "test --only security",
+      "test --only performance"
     ]
   ]
 end
 ```
 
+## Testing Roadmap
+
+### Phase 1: Critical Tests (Day 1-2)
+1. Add concurrency tests for race conditions
+2. Add input validation tests
+3. Fix timing-dependent tests
+4. Add basic integration tests
+
+### Phase 2: Coverage Expansion (Week 1)
+1. Add context module tests (once created)
+2. Add property-based tests
+3. Add performance benchmarks
+4. Achieve 60% coverage
+
+### Phase 3: Quality Assurance (Week 2)
+1. Add security test suite
+2. Add load testing
+3. Set up CI/CD pipeline
+4. Achieve 80% coverage
+
 ## Conclusion
 
-The current test suite is inadequate for production use. With only ~25% coverage and missing entire categories of tests (integration, performance, security), the application is at high risk for regressions and undetected bugs. Implementing comprehensive testing would require approximately 2-3 weeks of focused effort but would dramatically improve code quality and reliability.
+The current test suite is inadequate for production use. With only ~25% coverage and missing entire categories of tests (concurrency, integration, performance, security), the application is at high risk for regressions and undetected bugs. 
+
+The most critical gap is the lack of concurrency testing for the race condition in vote counting. This should be the first priority, followed by input validation and integration tests.
+
+Implementing comprehensive testing would require approximately 2-3 weeks of focused effort but would dramatically improve code quality and reliability. The investment in testing will pay dividends in reduced bugs, faster development cycles, and increased confidence in deployments.

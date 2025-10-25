@@ -116,7 +116,7 @@ end
 ```
 
 ### 4. Cross-Site Scripting (XSS) ⚠️ MEDIUM
-**Location:** User-provided language names
+**Location:** User-provided language names and chart tooltips
 
 ```elixir
 def handle_event("add_language", %{"name" => name}, socket) do
@@ -131,6 +131,8 @@ end
 ```javascript
 // User submits:
 name: "<script>alert('XSS')</script>"
+// Or in chart tooltips:
+name: "JavaScript<img src=x onerror=alert('XSS')>"
 ```
 
 **Solution:**
@@ -143,9 +145,21 @@ defmodule LivePoll.Polls do
     |> Option.changeset(%{text: sanitized_name, votes: 0})
     |> validate_length(:text, max: 50)
     |> validate_format(:text, ~r/^[a-zA-Z0-9\s\#\+\-\.]+$/)
+    |> unique_constraint(:text)
     |> Repo.insert()
   end
 end
+
+# In JavaScript for chart tooltips:
+tooltip: {
+  formatter: function(params) {
+    // Escape HTML entities
+    const name = params.name.replace(/[<>&"']/g, function(c) {
+      return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c];
+    });
+    return `${name}: ${params.value} votes`;
+  }
+}
 ```
 
 ### 5. Insecure Direct Object References ⚠️ MEDIUM
@@ -153,7 +167,7 @@ end
 
 ```elixir
 def handle_event("vote", %{"id" => id}, socket) do
-  option = Repo.get!(Option, id)  # No validation
+  option = Repo.get!(Option, id)  # No validation, crashes on invalid ID
   # ...
 end
 ```
@@ -170,6 +184,20 @@ def handle_event("vote", %{"id" => id}, socket) do
     _ -> {:noreply, put_flash(socket, :error, "Invalid option")}
   end
 end
+```
+
+### 6. Race Condition in Vote Counting ⚠️ HIGH
+**Impact:** Lost votes under concurrent access
+
+```elixir
+# Current: Read-modify-write pattern (NOT ATOMIC)
+option = Repo.get!(Option, id)
+updated = Ecto.Changeset.change(option, votes: option.votes + 1)
+Repo.update(updated)
+
+# Solution: Atomic increment
+from(o in Option, where: o.id == ^id)
+|> Repo.update_all([inc: [votes: 1]], returning: true)
 ```
 
 ## Missing Security Headers
@@ -229,18 +257,13 @@ config :live_poll, LivePollWeb.Endpoint,
   ]
 ```
 
-### 2. No CSRF Token Validation
-While Phoenix provides CSRF protection, critical operations should double-check:
+### 2. CSRF Protection
+Phoenix provides CSRF protection by default, which is properly implemented:
+- `csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")` (app.js:29)
+- `params: {_csrf_token: csrfToken}` (app.js:31)
+- Phoenix LiveView automatically validates CSRF tokens
 
-```elixir
-def handle_event("reset_votes", params, socket) do
-  with :ok <- verify_csrf_token(params["csrf_token"], socket) do
-    # Process reset
-  else
-    _ -> {:noreply, put_flash(socket, :error, "Invalid request")}
-  end
-end
-```
+**Status:** ✅ Properly implemented
 
 ## Input Validation Issues
 
@@ -249,7 +272,7 @@ No validation on user inputs:
 
 ```elixir
 # Current: No validation
-def handle_event("add_language", %{"name" => name}, socket) do
+def handle_event("add_language", %{"name" => name}, socket) when byte_size(name) > 0 do
   %Option{} |> Ecto.Changeset.change(text: name, votes: 0)
 end
 
@@ -280,6 +303,17 @@ def handle_event("vote", %{"id" => id}, socket) do
     :error -> {:noreply, put_flash(socket, :error, "Invalid vote")}
   end
 end
+```
+
+### 3. Missing Unique Constraint
+No database constraint preventing duplicate language names:
+
+```elixir
+# Add migration:
+create unique_index(:poll_options, [:text])
+
+# Update changeset:
+|> unique_constraint(:text)
 ```
 
 ## Denial of Service Vulnerabilities
@@ -340,6 +374,19 @@ config :live_poll, LivePollWeb.Endpoint,
     compress: true,
     max_frame_size: 8_000_000  # 8MB limit
   ]
+```
+
+### 4. Database Exhaustion
+VoteEvents accumulate indefinitely without cleanup.
+
+**Solution:**
+```elixir
+defmodule LivePoll.Poll.DataRetention do
+  def cleanup_old_events(days \\ 30) do
+    cutoff = DateTime.add(DateTime.utc_now(), -days * 24 * 60 * 60)
+    Repo.delete_all(from e in VoteEvent, where: e.inserted_at < ^cutoff)
+  end
+end
 ```
 
 ## Data Privacy Concerns
@@ -406,26 +453,37 @@ end
 
 ## Security Checklist
 
-### Immediate Actions Required
+### ✅ Passed
+- [x] CSRF protection implemented
+- [x] SQL injection prevention (mostly - using Ecto)
+- [x] Phoenix session security (default)
+- [x] No sensitive data exposure
+
+### ⚠️ Immediate Actions Required
 - [ ] Implement rate limiting
 - [ ] Add authentication for admin functions
 - [ ] Validate all user inputs
 - [ ] Add security headers
-- [ ] Implement CSRF protection
+- [ ] Fix race condition in voting
+- [ ] Add unique constraint on language names
+- [ ] Escape chart tooltip content
 
-### Short-term Improvements
+### 📋 Short-term Improvements
 - [ ] Add session management
 - [ ] Implement audit logging
 - [ ] Add input sanitization
 - [ ] Set up monitoring/alerting
 - [ ] Implement error boundaries
+- [ ] Add data retention policy
+- [ ] Implement HTTPS enforcement
 
-### Long-term Security Enhancements
+### 🔮 Long-term Security Enhancements
 - [ ] Add WAF (Web Application Firewall)
 - [ ] Implement OAuth/SSO
 - [ ] Add encryption at rest
 - [ ] Implement security scanning in CI/CD
 - [ ] Regular security audits
+- [ ] Penetration testing
 
 ## Security Testing
 
@@ -434,6 +492,7 @@ end
 # Check for vulnerable dependencies
 mix deps.audit
 mix sobelow --config
+npm audit --prefix assets
 ```
 
 ### 2. Security Headers Test
@@ -465,7 +524,7 @@ end
 defp deps do
   [
     # Rate limiting
-    {:hammer, "~> 6.1"},
+    {:hammer, "~> 6.2"},
     
     # Security headers
     {:secure_headers, "~> 0.0.1"},
@@ -479,7 +538,7 @@ defp deps do
     # Dependency audit
     {:mix_audit, "~> 2.1", only: [:dev, :test]},
     
-    # Authentication
+    # Authentication (if needed)
     {:guardian, "~> 2.3"},
     {:argon2_elixir, "~> 4.0"}
   ]
@@ -489,17 +548,26 @@ end
 ## Compliance Considerations
 
 ### OWASP Top 10 Coverage
-1. **Injection** - ⚠️ Partial (SQL injection risk)
+1. **Injection** - ⚠️ Partial (SQL injection risk with raw SQL)
 2. **Broken Authentication** - ❌ No authentication
-3. **Sensitive Data Exposure** - ⚠️ No encryption
+3. **Sensitive Data Exposure** - ✅ No sensitive data
 4. **XML External Entities** - ✅ N/A
 5. **Broken Access Control** - ❌ No access control
 6. **Security Misconfiguration** - ⚠️ Missing headers
-7. **XSS** - ⚠️ Input not sanitized
+7. **XSS** - ⚠️ Input not sanitized, tooltip risk
 8. **Insecure Deserialization** - ✅ Using Jason
-9. **Vulnerable Components** - ❓ Unknown
+9. **Vulnerable Components** - ⚠️ Need dependency audit
 10. **Insufficient Logging** - ❌ No audit logs
 
 ## Conclusion
 
-The application has critical security vulnerabilities that must be addressed before production deployment. The lack of rate limiting, authentication, and input validation makes it vulnerable to various attacks. Implementing the recommended security measures would require approximately 1-2 weeks of focused development but is essential for production readiness.
+The application has critical security vulnerabilities that must be addressed before production deployment. The lack of rate limiting, authentication, input validation, and the race condition in voting make it vulnerable to various attacks. Implementing the recommended security measures would require approximately 1-2 weeks of focused development but is essential for production readiness.
+
+**Priority Actions:**
+1. Fix race condition with atomic vote updates
+2. Implement rate limiting
+3. Add input validation and sanitization
+4. Add unique constraint on language names
+5. Escape chart tooltip content
+6. Add authentication for admin functions
+7. Implement security headers

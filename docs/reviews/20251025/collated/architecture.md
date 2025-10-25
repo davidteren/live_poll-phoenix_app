@@ -84,6 +84,7 @@ sequenceDiagram
 - Each client reloads all data on every update
 - No caching or optimization
 - Direct database access from LiveView
+- Non-atomic vote increments (read-modify-write pattern leads to lost updates under concurrency)
 
 ### Proposed Vote Flow
 ```mermaid
@@ -97,7 +98,7 @@ sequenceDiagram
     
     U->>LV: Click Vote
     LV->>C: cast_vote(option_id)
-    C->>DB: Transaction
+    C->>DB: Atomic increment with RETURNING
     C->>Cache: Update
     C->>PS: Broadcast delta
     PS->>LV: Update specific data
@@ -122,6 +123,7 @@ VoteEvent
 2. **No Partitioning:** All events in single table
 3. **No Aggregation Tables:** Calculates trends on-the-fly
 4. **Memory Intensive:** Loads all events for calculations
+5. **Inefficient Preload:** Unnecessary `preload :option` in trend queries
 
 ### Recommended Event Sourcing Pattern
 ```mermaid
@@ -183,6 +185,7 @@ This creates:
 - Duplicate rendering logic
 - Inconsistent updates
 - Maintenance burden
+- Unused code (PercentageTrendChart hook duplicates TrendChart)
 
 ### Recommended Approach
 Single charting strategy:
@@ -329,9 +332,13 @@ end
 2. Missing compound indexes
 3. No partitioning for time-series data
 4. Denormalized data
+5. Missing unique constraint on poll_options(text)
 
 ### Improved Schema
 ```sql
+-- Add unique constraint
+CREATE UNIQUE INDEX poll_options_text_unique ON poll_options(text);
+
 -- Partitioned events table
 CREATE TABLE vote_events (
     id BIGSERIAL,
@@ -343,8 +350,8 @@ CREATE TABLE vote_events (
 ) PARTITION BY RANGE (created_at);
 
 -- Create partitions
-CREATE TABLE vote_events_2024_10 PARTITION OF vote_events
-    FOR VALUES FROM ('2024-10-01') TO ('2024-11-01');
+CREATE TABLE vote_events_2025_10 PARTITION OF vote_events
+    FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
 
 -- Materialized view for trends
 CREATE MATERIALIZED VIEW hourly_trends AS
@@ -368,7 +375,8 @@ CREATE INDEX idx_vote_events_type_time
 ```elixir
 # Current: Load all events
 events = Repo.all(from e in VoteEvent, 
-  where: e.inserted_at >= ^cutoff_time)
+  where: e.inserted_at >= ^cutoff_time,
+  preload: :option)  # Unnecessary preload
 
 # Optimized: Aggregate in database
 trends = Repo.all(
@@ -384,6 +392,20 @@ trends = Repo.all(
     votes: max(e.votes_after)
   }
 )
+```
+
+### Atomic Vote Increments
+```elixir
+# Current: Race condition with read-modify-write
+option = Repo.get!(Option, id)
+{:ok, updated_option} = option
+  |> Ecto.Changeset.change(votes: option.votes + 1)
+  |> Repo.update()
+
+# Fixed: Atomic increment with RETURNING
+{1, [updated_option]} = 
+  from(o in Option, where: o.id == ^id, select: o)
+  |> Repo.update_all([inc: [votes: 1]], returning: true)
 ```
 
 ### LiveView Optimization
@@ -448,6 +470,44 @@ graph TB
     N2 --> Replica2
 ```
 
+## Project Guideline Compliance
+
+### Current Violations
+1. **Inline Scripts:** Theme toggle script in root.html.heex (should be in assets/js)
+2. **Flash Group Misuse:** `<Layouts.flash_group>` called outside layouts module
+3. **Missing Layout Wrapper:** LiveView template not wrapped with `<Layouts.app>`
+4. **Form Patterns:** Not using `to_form` + `<.form>` + `<.input>` for Add Language form
+5. **DaisyUI Usage:** Contrary to project guidance preferring Tailwind-only custom components
+
+### Fixes Required
+```elixir
+# Wrap template properly
+~H"""
+<Layouts.app flash={@flash}>
+  <!-- Poll content here -->
+</Layouts.app>
+"""
+
+# Use proper form components
+def render(assigns) do
+  ~H"""
+  <.form for={@form} id="language-form" phx-submit="add_language">
+    <.input field={@form[:name]} type="text" placeholder="Language name" />
+    <.button type="submit">Add</.button>
+  </.form>
+  """
+end
+```
+
 ## Conclusion
 
 The current architecture suffers from fundamental design issues that limit scalability, maintainability, and testability. The monolithic LiveView and missing business logic layer are the most critical problems. A proper refactoring following Phoenix conventions and SOLID principles would significantly improve the application's quality and maintainability.
+
+Key improvements needed:
+1. Extract business logic to context modules
+2. Implement atomic vote increments to prevent concurrency issues
+3. Add unique constraints and proper indexes
+4. Remove unnecessary preloads and optimize queries
+5. Fix project guideline violations
+6. Implement proper caching and aggregation strategies
+7. Clean up duplicate chart rendering code

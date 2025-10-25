@@ -12,7 +12,7 @@ The LivePoll application has significant performance issues that will manifest u
 events = from(e in VoteEvent,
   where: e.inserted_at >= ^cutoff_time,
   order_by: [asc: e.inserted_at],
-  preload: :option
+  preload: :option  # Unnecessary preload adding overhead
 ) |> Repo.all()
 ```
 
@@ -20,6 +20,7 @@ events = from(e in VoteEvent,
 - With 10,000 votes, loads ~400KB into memory per client
 - With 100 concurrent users = 40MB RAM
 - With 1,000 concurrent users = 400MB RAM
+- Unnecessary preload of :option increases memory usage
 
 **Solution:**
 ```elixir
@@ -39,7 +40,45 @@ trends = Repo.all(
 )
 ```
 
-### 2. N+1 Query Pattern
+### 2. Inefficient Seeding Process
+**Location:** `poll_live.ex:104-250`
+
+Seeding 10,000 votes with individual inserts and follow-up UPDATE statements:
+
+```elixir
+# Current: O(N) inserts + O(N) updates = 20,000+ DB operations
+Enum.each(vote_events, fn event ->
+  vote_event = Repo.insert!(%VoteEvent{...})
+  Ecto.Adapters.SQL.query!(Repo, 
+    "UPDATE vote_events SET inserted_at = $1 WHERE id = $2",
+    [event.timestamp, vote_event.id])
+end)
+```
+
+**Solution:**
+```elixir
+# Optimized: Batch insert with precomputed timestamps
+def seed_votes(count) do
+  Repo.transaction(fn ->
+    vote_events = 
+      generate_events(count)
+      |> Enum.map(fn event ->
+        %{
+          option_id: event.option_id,
+          language: event.language,
+          votes_after: event.votes_after,
+          event_type: "seed",
+          inserted_at: event.timestamp,
+          updated_at: event.timestamp
+        }
+      end)
+      |> Enum.chunk_every(1000)
+      |> Enum.each(&Repo.insert_all(VoteEvent, &1))
+  end)
+end
+```
+
+### 3. N+1 Query Pattern
 **Location:** Multiple locations in `poll_live.ex`
 
 Each broadcast triggers:
@@ -77,40 +116,20 @@ defmodule LivePoll.Stats.Loader do
 end
 ```
 
-### 3. Blocking Seeding Operation
-**Location:** `poll_live.ex:104-250`
-
-Seeding 10,000 votes blocks the LiveView process for ~5-10 seconds:
+### 4. Non-Atomic Vote Updates
+**Critical:** Race condition in vote counting leads to lost updates:
 
 ```elixir
-# Current: Synchronous in LiveView
-def handle_info(:perform_seeding, socket) do
-  # Insert 10,000 records synchronously
-  Enum.each(vote_events, fn event ->
-    Repo.insert!(%VoteEvent{...})
-  end)
-end
-```
+# Current: Read-modify-write (RACE CONDITION)
+option = Repo.get!(Option, id)
+{:ok, updated} = option
+  |> Ecto.Changeset.change(votes: option.votes + 1)
+  |> Repo.update()
 
-**Solution:**
-Use Task or Oban for background processing:
-```elixir
-defmodule LivePoll.Polls.Seeder do
-  use Oban.Worker, queue: :default
-  
-  @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"count" => count}}) do
-    # Bulk insert with Repo.insert_all
-    vote_events = generate_events(count)
-    
-    Repo.insert_all(VoteEvent, vote_events,
-      on_conflict: :nothing,
-      conflict_target: [:id]
-    )
-    
-    :ok
-  end
-end
+# Fixed: Atomic increment with RETURNING
+{1, [updated]} = 
+  from(o in Option, where: o.id == ^id, select: o)
+  |> Repo.update_all([inc: [votes: 1]], returning: true)
 ```
 
 ## Database Performance Issues
@@ -248,7 +267,7 @@ end
 **Current complexity:** O(n * m) where n = events, m = buckets
 
 ```elixir
-# Current: Complex nested operations
+# Current: Complex nested operations (150+ lines)
 events_by_bucket = events |> Enum.group_by(fn event -> ... end)
 all_buckets = Stream.iterate(start_bucket, &(&1 + bucket_seconds))
 Enum.map_reduce(all_buckets, %{}, fn bucket_time, current_state -> ... end)
@@ -325,6 +344,12 @@ Current broadcasts send entire state:
 }}
 ```
 
+### 4. Bundle Size Optimization
+- **Remove DaisyUI:** ~300KB savings (unused and against guidelines)
+- **Lazy load ECharts:** Load on chart visibility
+- **Tree shake:** Remove unused ECharts features
+- **Remove duplicate code:** PercentageTrendChart duplicates TrendChart
+
 ## Benchmarking Results
 
 ### Load Test Simulation
@@ -365,16 +390,19 @@ end
 
 ### Immediate Fixes (Quick Wins)
 1. **Add database indexes** - 5 minute fix, 50% query improvement
-2. **Implement basic caching** - 1 hour fix, 70% load reduction
-3. **Limit recent activity list** - 5 minute fix, prevents memory leak
-4. **Batch database inserts** - 30 minute fix, 90% faster seeding
+2. **Remove unnecessary preload** - 2 minute fix, 20% memory reduction
+3. **Implement atomic vote updates** - 30 minute fix, prevents data corruption
+4. **Limit recent activity list** - 5 minute fix, prevents memory leak
+5. **Batch database inserts** - 1 hour fix, 90% faster seeding
 
 ### Short-term Improvements (1 Week)
 1. **Extract trend calculation to GenServer**
 2. **Implement connection pooling optimization**
-3. **Add ETS caching for frequently accessed data**
+3. **Add ETS/Cachex caching for frequently accessed data**
 4. **Optimize JavaScript chart updates**
 5. **Implement database query aggregation**
+6. **Use LiveView streams for collections**
+7. **Remove DaisyUI and duplicate JavaScript**
 
 ### Long-term Solutions (1 Month)
 1. **Implement CQRS with event sourcing**
@@ -382,6 +410,7 @@ end
 3. **Partition vote_events table by month**
 4. **Implement read replicas for queries**
 5. **Add CDN for static assets**
+6. **Implement data retention policy**
 
 ## Performance Monitoring
 
@@ -446,6 +475,18 @@ defmodule LivePollWeb.Telemetry do
 end
 ```
 
+## Performance Targets
+
+### After Optimization
+- **Response Time:** <100ms for vote operations (p95)
+- **Bundle Size:** <500KB total
+- **Database Queries:** <5 per user action
+- **Concurrent Users:** 5000+ supported
+- **Memory Usage:** <50MB for 1000 users
+- **Seeding Time:** <2 seconds for 10,000 votes
+
 ## Conclusion
 
-The application's performance issues stem from fundamental architectural problems: loading all data into memory, lack of caching, inefficient queries, and blocking operations in the LiveView process. With the current architecture, the application will struggle beyond 100 concurrent users. Implementing the recommended optimizations could improve performance by 10-100x, allowing the application to handle thousands of concurrent users.
+The application's performance issues stem from fundamental architectural problems: loading all data into memory, lack of caching, inefficient queries, non-atomic updates, and blocking operations in the LiveView process. With the current architecture, the application will struggle beyond 100 concurrent users. 
+
+Implementing the recommended optimizations could improve performance by 10-100x, allowing the application to handle thousands of concurrent users. Priority should be given to fixing the atomic vote updates, removing unnecessary preloads, implementing batch inserts for seeding, and adding proper database indexes.
