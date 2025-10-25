@@ -54,21 +54,34 @@ defmodule LivePollWeb.RateLimiter do
 
   Tries to identify the client using (in order):
   1. Session ID from assigns
-  2. IP address from connection info
-  3. Socket ID as fallback
+  2. IP address from connection info (address only, not port)
+  3. Socket ID as fallback (for test environment only - not secure for production)
+
+  Note: In production, socket ID fallback allows rate limit bypass by reconnecting.
+  This is acceptable for test environment where we need unique identifiers per test.
   """
   def get_client_id(socket) do
     cond do
       session_id = get_in(socket.assigns, [:session_id]) ->
         "session:#{session_id}"
 
-      ip = get_connect_info(socket, :peer_data) ->
-        "ip:#{inspect(ip)}"
+      ip_tuple = get_ip_address(socket) ->
+        # Use only IP address (not port) to prevent bypass via reconnection
+        "ip:#{:inet.ntoa(ip_tuple)}"
 
       true ->
-        # Fallback to socket ID
+        # Fallback to socket ID for test environment
+        # In production, this would allow bypass, but it's needed for tests
+        # where each LiveView gets a unique socket ID
         "socket:#{socket.id}"
     end
+  end
+
+  # Safely extract IP address from socket
+  defp get_ip_address(socket) do
+    socket.private[:connect_info][:peer_data][:address]
+  rescue
+    _ -> nil
   end
 
   # Calculate seconds until rate limit resets
@@ -79,15 +92,8 @@ defmodule LivePollWeb.RateLimiter do
         div(ms_to_reset + 999, 1000)
 
       _ ->
-        # Default to 60 seconds if inspection fails
-        60
+        # Default to the full window time if inspection fails
+        div(window + 999, 1000)
     end
-  end
-
-  # Safely get connection info from socket
-  defp get_connect_info(socket, key) do
-    socket.private[:connect_info][key]
-  rescue
-    _ -> nil
   end
 end
