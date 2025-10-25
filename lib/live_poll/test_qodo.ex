@@ -4,7 +4,9 @@ defmodule LivePoll.TestQodo do
   This file contains patterns that should trigger our Phoenix-specific checks.
   """
 
+  import Ecto.Query
   alias LivePoll.Repo
+  alias LivePoll.Poll
   alias LivePoll.Poll.VoteEvent
 
   # This should trigger: "Replace read-modify-write with atomic operations"
