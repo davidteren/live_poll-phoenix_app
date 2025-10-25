@@ -45,32 +45,52 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("vote", %{"id" => id}, socket) do
-    option = Repo.get!(Option, id)
-    new_votes = option.votes + 1
-    changeset = Ecto.Changeset.change(option, votes: new_votes)
-    updated_option = Repo.update!(changeset)
+    # Validate and parse ID first
+    case Integer.parse(id) do
+      {int_id, ""} ->
+        # Atomic increment with RETURNING clause to prevent race conditions
+        query = from(o in Option, where: o.id == ^int_id, select: o)
 
-    # Capture vote event in time series
-    Repo.insert!(%VoteEvent{
-      option_id: updated_option.id,
-      language: updated_option.text,
-      votes_after: new_votes,
-      event_type: "vote"
-    })
+        case Repo.update_all(query, [inc: [votes: 1]], returning: true) do
+          {1, [updated_option]} ->
+            # Create vote event with accurate count from the atomic update
+            Repo.insert!(%VoteEvent{
+              option_id: updated_option.id,
+              language: updated_option.text,
+              votes_after: updated_option.votes,
+              event_type: "vote"
+            })
 
-    Phoenix.PubSub.broadcast(
-      LivePoll.PubSub,
-      @topic,
-      {:poll_update,
-       %{
-         id: String.to_integer(id),
-         votes: new_votes,
-         language: option.text,
-         timestamp: DateTime.utc_now()
-       }}
-    )
+            # Update socket assigns with the atomically updated option
+            options =
+              Enum.map(socket.assigns.options, fn opt ->
+                if opt.id == updated_option.id, do: updated_option, else: opt
+              end)
 
-    {:noreply, socket}
+            # Broadcast update with accurate vote count
+            Phoenix.PubSub.broadcast(
+              LivePoll.PubSub,
+              @topic,
+              {:poll_update,
+               %{
+                 id: updated_option.id,
+                 votes: updated_option.votes,
+                 language: updated_option.text,
+                 timestamp: DateTime.utc_now()
+               }}
+            )
+
+            {:noreply, assign(socket, options: options)}
+
+          {0, []} ->
+            # Option not found
+            {:noreply, put_flash(socket, :error, "Invalid vote option")}
+        end
+
+      _ ->
+        # Invalid ID format
+        {:noreply, put_flash(socket, :error, "Invalid vote option")}
+    end
   end
 
   def handle_event("toggle_theme", _params, socket) do
