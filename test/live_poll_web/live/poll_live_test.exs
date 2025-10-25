@@ -80,25 +80,27 @@ defmodule LivePollWeb.PollLiveTest do
       assert render(view2) =~ "1 vote"
     end
 
-    test "handles concurrent votes without losing updates", %{options: [elixir | _]} do
+    test "handles concurrent votes without losing updates", %{conn: conn, options: [elixir | _]} do
       # Reset vote count to 0
       Repo.update!(Ecto.Changeset.change(elixir, votes: 0))
 
-      # Simulate 100 concurrent votes using atomic increments
+      # Mount the LiveView once
+      {:ok, view, _html} = live(conn, "/")
+
+      # Simulate 100 concurrent votes through the public API
       tasks =
         for _ <- 1..100 do
           Task.async(fn ->
-            # Directly test the atomic increment logic
-            from(o in Option,
-              where: o.id == ^elixir.id,
-              select: o
-            )
-            |> Repo.update_all([inc: [votes: 1]], returning: true)
+            # Test the actual event handler concurrently
+            # Use render_click to simulate real user interaction
+            view
+            |> element("button[phx-click='vote'][phx-value-id='#{elixir.id}']")
+            |> render_click()
           end)
         end
 
       # Wait for all tasks to complete
-      Task.await_many(tasks, 5000)
+      Task.await_many(tasks, 10000)
 
       # Verify all votes were counted (no lost updates)
       updated = Repo.get!(Option, elixir.id)
