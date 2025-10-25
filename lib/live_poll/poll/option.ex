@@ -6,13 +6,75 @@ defmodule LivePoll.Poll.Option do
     field :text, :string
     field :votes, :integer
 
+    has_many :vote_events, LivePoll.Poll.VoteEvent
+
     timestamps(type: :utc_datetime)
   end
 
-  @doc false
+  @doc """
+  Changeset for creating/updating options with validation.
+
+  Validates:
+  - Required text field
+  - Length between 1-50 characters
+  - Only allowed characters (letters, numbers, spaces, and common programming symbols)
+  - Trims whitespace
+  - Normalizes case for consistency
+  - Ensures uniqueness (case-insensitive)
+  """
   def changeset(option, attrs) do
     option
     |> cast(attrs, [:text, :votes])
-    |> validate_required([:text, :votes])
+    |> validate_required([:text])
+    |> validate_length(:text, min: 1, max: 50)
+    |> validate_format(:text, ~r/^[a-zA-Z0-9\s\#\+\-\.\(\)\/]+$/,
+      message: "only letters, numbers, spaces and common programming symbols allowed"
+    )
+    |> update_change(:text, &String.trim/1)
+    |> update_change(:text, &normalize_case/1)
+    |> unique_constraint(:text,
+      name: :poll_options_text_unique,
+      message: "This language already exists"
+    )
+  end
+
+  defp normalize_case(text) do
+    # Preserve case for acronyms and special cases
+    case text do
+      "PHP" ->
+        "PHP"
+
+      "SQL" ->
+        "SQL"
+
+      "MATLAB" ->
+        "MATLAB"
+
+      "COBOL" ->
+        "COBOL"
+
+      "R" ->
+        "R"
+
+      "C" ->
+        "C"
+
+      "C++" ->
+        "C++"
+
+      "C#" ->
+        "C#"
+
+      "F#" ->
+        "F#"
+
+      _ ->
+        # Title case for most languages
+        text
+        |> String.downcase()
+        |> String.split()
+        |> Enum.map(&String.capitalize/1)
+        |> Enum.join(" ")
+    end
   end
 end
