@@ -298,4 +298,127 @@ defmodule LivePollWeb.PollLiveTest do
       assert html =~ "data-language=\"Ruby\""
     end
   end
+
+  describe "rate limiting" do
+    test "prevents rapid voting beyond limit", %{conn: conn, options: [elixir | _]} do
+      {:ok, view, _html} = live(conn, "/")
+
+      # First 10 votes should succeed (rate limit is 10 per minute)
+      for _ <- 1..10 do
+        view |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+      end
+
+      # Verify 10 votes were recorded
+      updated_option = Repo.get!(Option, elixir.id)
+      assert updated_option.votes == 10
+
+      # 11th vote should be rate limited
+      html = view |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+      assert html =~ "Too many votes"
+
+      # Vote count should still be 10
+      updated_option = Repo.get!(Option, elixir.id)
+      assert updated_option.votes == 10
+    end
+
+    test "rate limits reset_votes action", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/")
+
+      # First reset should succeed
+      view |> element("button[phx-click='reset_votes']") |> render_click()
+
+      # Wait a moment for the operation to complete
+      :timer.sleep(100)
+
+      # Second reset should be rate limited
+      html = view |> element("button[phx-click='reset_votes']") |> render_click()
+      assert html =~ "Reset can only be done once per hour"
+    end
+
+    test "rate limits add_language action", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/")
+
+      # First 5 languages should succeed (rate limit is 5 per 5 minutes)
+      for i <- 1..5 do
+        view
+        |> element("form[phx-submit='add_language']")
+        |> render_submit(%{name: "Language#{i}"})
+      end
+
+      # Verify 5 languages were added (plus 4 initial = 9 total)
+      assert Repo.aggregate(Option, :count) == 9
+
+      # 6th language should be rate limited
+      html =
+        view
+        |> element("form[phx-submit='add_language']")
+        |> render_submit(%{name: "Language6"})
+
+      assert html =~ "Too many languages added"
+
+      # Count should still be 9
+      assert Repo.aggregate(Option, :count) == 9
+    end
+
+    test "rate limits seed_data action", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/")
+
+      # First seed should succeed
+      view |> element("button[phx-click='seed_data']") |> render_click()
+
+      # Wait for seeding to start
+      :timer.sleep(100)
+
+      # Second seed should be rate limited
+      html = view |> element("button[phx-click='seed_data']") |> render_click()
+      assert html =~ "Seeding can only be done once per hour"
+    end
+
+    test "different actions have independent rate limits", %{conn: conn, options: [elixir | _]} do
+      {:ok, view, _html} = live(conn, "/")
+
+      # Use up vote limit
+      for _ <- 1..10 do
+        view |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+      end
+
+      # Voting should be rate limited
+      html = view |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+      assert html =~ "Too many votes"
+
+      # But adding a language should still work (different rate limit)
+      html =
+        view
+        |> element("form[phx-submit='add_language']")
+        |> render_submit(%{name: "NewLanguage"})
+
+      refute html =~ "Too many languages added"
+
+      # Verify language was added
+      assert Repo.get_by(Option, text: "NewLanguage")
+    end
+
+    test "rate limits are per-client", %{conn: conn, options: [elixir | _]} do
+      {:ok, view1, _html} = live(conn, "/")
+      {:ok, view2, _html} = live(conn, "/")
+
+      # Client 1 uses up their vote limit
+      for _ <- 1..10 do
+        view1 |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+      end
+
+      # Client 1 should be rate limited
+      html1 = view1 |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+      assert html1 =~ "Too many votes"
+
+      # Client 2 should still be able to vote (different client)
+      # Note: In test environment, both connections might share the same socket ID
+      # This test may need adjustment based on actual client identification in tests
+      view2 |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+
+      # At least 11 votes should be recorded (10 from client1 + 1 from client2)
+      updated_option = Repo.get!(Option, elixir.id)
+      assert updated_option.votes >= 11
+    end
+  end
 end
