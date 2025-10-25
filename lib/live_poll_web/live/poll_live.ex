@@ -288,10 +288,12 @@ defmodule LivePollWeb.PollLive do
     num_languages = Enum.random(12..14)
     selected_languages = Enum.take_random(languages_with_weights, num_languages)
 
-    # Create options with 0 votes initially
+    # Create options with 0 votes initially using Polls context for consistent normalization
     options =
       Enum.map(selected_languages, fn {lang, _weight} ->
-        Repo.insert!(%Option{text: lang, votes: 0})
+        # Use Polls.add_language to ensure consistent case normalization
+        {:ok, option} = Polls.add_language(lang)
+        option
       end)
 
     # Backfill vote events over the last hour

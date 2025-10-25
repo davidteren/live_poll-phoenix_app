@@ -79,9 +79,7 @@ defmodule LivePollWeb.RateLimiter do
 
   # Safely extract IP address from socket
   defp get_ip_address(socket) do
-    socket.private[:connect_info][:peer_data][:address]
-  rescue
-    _ -> nil
+    get_in(socket.private, [:connect_info, :peer_data, :address])
   end
 
   # Calculate seconds until rate limit resets

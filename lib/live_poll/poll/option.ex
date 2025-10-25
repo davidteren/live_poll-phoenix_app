@@ -31,50 +31,10 @@ defmodule LivePoll.Poll.Option do
       message: "only letters, numbers, spaces and common programming symbols allowed"
     )
     |> update_change(:text, &String.trim/1)
-    |> update_change(:text, &normalize_case/1)
+    |> update_change(:text, &LivePoll.Polls.normalize_language_name/1)
     |> unique_constraint(:text,
       name: :poll_options_text_unique,
       message: "This language already exists"
     )
-  end
-
-  defp normalize_case(text) do
-    # Preserve case for acronyms and special cases
-    case text do
-      "PHP" ->
-        "PHP"
-
-      "SQL" ->
-        "SQL"
-
-      "MATLAB" ->
-        "MATLAB"
-
-      "COBOL" ->
-        "COBOL"
-
-      "R" ->
-        "R"
-
-      "C" ->
-        "C"
-
-      "C++" ->
-        "C++"
-
-      "C#" ->
-        "C#"
-
-      "F#" ->
-        "F#"
-
-      _ ->
-        # Title case for most languages
-        text
-        |> String.downcase()
-        |> String.split()
-        |> Enum.map(&String.capitalize/1)
-        |> Enum.join(" ")
-    end
   end
 end
