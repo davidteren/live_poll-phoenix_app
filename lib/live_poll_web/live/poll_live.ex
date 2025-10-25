@@ -3,6 +3,7 @@ defmodule LivePollWeb.PollLive do
 
   alias LivePoll.Poll.Option
   alias LivePoll.Poll.VoteEvent
+  alias LivePoll.Polls
   alias LivePoll.Repo
   alias LivePollWeb.RateLimiter
   import Ecto.Query
@@ -145,29 +146,45 @@ defmodule LivePollWeb.PollLive do
 
     case RateLimiter.check_rate(client_id, :add_language) do
       {:ok, _} ->
-        # Check if language already exists
-        existing = Repo.get_by(Option, text: name)
+        case Polls.add_language(name) do
+          {:ok, option} ->
+            # Update local state
+            options = [option | socket.assigns.options] |> Enum.sort_by(& &1.id)
+            sorted_options = Enum.sort_by(options, & &1.votes, :desc)
 
-        if existing do
-          {:noreply, socket}
-        else
-          # Create new language option
-          %Option{}
-          |> Ecto.Changeset.change(text: name, votes: 0)
-          |> Repo.insert!()
+            {:noreply,
+             socket
+             |> assign(:options, options)
+             |> assign(:sorted_options, sorted_options)
+             |> put_flash(:info, "Added #{option.text} to the poll!")}
 
-          # Broadcast update to all clients
-          Phoenix.PubSub.broadcast(
-            LivePoll.PubSub,
-            @topic,
-            {:language_added, %{name: name}}
-          )
+          {:error, message} when is_binary(message) ->
+            # Check if it's a duplicate error and provide helpful message
+            if String.contains?(message, "already exists") do
+              similar = Polls.find_similar_languages(name)
 
-          {:noreply, socket}
+              suggestion =
+                if length(similar) > 0 do
+                  names = Enum.map(similar, & &1.text) |> Enum.join(", ")
+                  " Did you mean: #{names}?"
+                else
+                  ""
+                end
+
+              {:noreply,
+               put_flash(socket, :error, "#{name} already exists in the poll.#{suggestion}")}
+            else
+              {:noreply, put_flash(socket, :error, message)}
+            end
         end
 
-      {:error, :rate_limited, _} ->
-        {:noreply, put_flash(socket, :error, "Too many languages added. Please wait.")}
+      {:error, :rate_limited, %{retry_after: retry_after}} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Too many languages added. Please wait #{retry_after} seconds."
+         )}
     end
   end
 
