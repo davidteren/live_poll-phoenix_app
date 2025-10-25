@@ -9,6 +9,9 @@ defmodule LivePoll.Polls do
   alias LivePoll.Repo
   alias LivePoll.Poll.Option
 
+  # List of programming language acronyms that should preserve their case
+  @acronyms ["PHP", "SQL", "MATLAB", "COBOL", "R", "C", "C++", "C#", "F#"]
+
   @doc """
   Add a new programming language with validation.
 
@@ -129,6 +132,39 @@ defmodule LivePoll.Polls do
       "#{field}: #{Enum.join(errors, ", ")}"
     end)
     |> Enum.join("; ")
+  end
+
+  @doc """
+  Normalize a programming language name for consistent storage.
+
+  Preserves case for known acronyms (PHP, SQL, C++, etc.) and applies
+  title case to other language names.
+
+  ## Examples
+
+      iex> normalize_language_name("python")
+      "Python"
+
+      iex> normalize_language_name("php")
+      "PHP"
+
+      iex> normalize_language_name("c++")
+      "C++"
+  """
+  def normalize_language_name(text) when is_binary(text) do
+    # Convert to uppercase for case-insensitive matching against acronyms
+    case String.upcase(text) do
+      acronym when acronym in @acronyms ->
+        acronym
+
+      _ ->
+        # Title case for most languages
+        text
+        |> String.downcase()
+        |> String.split()
+        |> Enum.map(&String.capitalize/1)
+        |> Enum.join(" ")
+    end
   end
 
   defp broadcast_option_added(option) do
