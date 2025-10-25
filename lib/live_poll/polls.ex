@@ -148,6 +148,10 @@ defmodule LivePoll.Polls do
   end
 
   defp broadcast_option_added(option) do
+    # NOTE: This is a single-tenant application with a global poll
+    # All users participate in the same poll, so broadcasting language names
+    # on a global topic is intentional and safe for this use case.
+    # For multi-tenant applications, consider scoping topics by tenant/poll ID.
     Phoenix.PubSub.broadcast(
       LivePoll.PubSub,
       "poll:updates",

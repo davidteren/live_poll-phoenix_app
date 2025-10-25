@@ -54,6 +54,9 @@ defmodule LivePoll.Poll.Option do
       "C++" -> "C++"
       "C#" -> "C#"
       "F#" -> "F#"
+      "JAVASCRIPT" -> "JavaScript"
+      "TYPESCRIPT" -> "TypeScript"
+      "OBJECTIVE-C" -> "Objective-C"
       _ ->
         # Title case for most languages
         text

@@ -2,6 +2,12 @@ defmodule LivePoll.Repo.Migrations.AddUniqueConstraintToPollOptions do
   use Ecto.Migration
 
   def up do
+    # NOTE: This migration runs in a transaction by default (Ecto.Migration behavior)
+    # This prevents concurrent writes during the migration process
+
+    # Lock the table to prevent concurrent writes during duplicate merge
+    execute "LOCK TABLE poll_options IN EXCLUSIVE MODE"
+
     # First, merge vote counts from duplicates before deletion
     # This ensures we don't lose vote data
     execute """
@@ -31,6 +37,8 @@ defmodule LivePoll.Repo.Migrations.AddUniqueConstraintToPollOptions do
     # Add case-insensitive unique index on trimmed text
     # This prevents duplicates like "Python", "python", " Python " from being created
     create unique_index(:poll_options, ["lower(trim(text))"], name: :poll_options_text_unique)
+
+    # Transaction commits automatically, releasing the lock
   end
 
   def down do

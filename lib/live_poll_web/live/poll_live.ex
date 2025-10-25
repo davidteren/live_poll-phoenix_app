@@ -101,9 +101,10 @@ defmodule LivePollWeb.PollLive do
   def handle_event("add_language", %{"name" => name}, socket) when byte_size(name) > 0 do
     case LivePoll.Polls.add_language(name) do
       {:ok, option} ->
-        # Reload options to include the new one
-        options = Repo.all(Option) |> Enum.sort_by(& &1.id)
-        total_votes = Enum.sum(Enum.map(options, & &1.votes))
+        # Append new option to existing list (avoid unnecessary DB query)
+        options = socket.assigns.options ++ [option]
+        # New option has 0 votes, so total_votes remains unchanged
+        total_votes = socket.assigns.total_votes
         sorted_options = Enum.sort_by(options, & &1.votes, :desc)
 
         {:noreply,
