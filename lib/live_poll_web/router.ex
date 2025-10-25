@@ -8,6 +8,7 @@ defmodule LivePollWeb.Router do
     plug :put_root_layout, html: {LivePollWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug LivePollWeb.RateLimitPlug
   end
 
   pipeline :api do

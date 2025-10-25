@@ -11,6 +11,12 @@ config :live_poll,
   ecto_repos: [LivePoll.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+# Configure Hammer rate limiter
+config :hammer,
+  backend:
+    {Hammer.Backend.ETS,
+     [expiry_ms: 60_000 * 60 * 24, cleanup_interval_ms: 60_000 * 10]}
+
 # Configures the endpoint
 config :live_poll, LivePollWeb.Endpoint,
   url: [host: "localhost"],
