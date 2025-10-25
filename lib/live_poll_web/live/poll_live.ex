@@ -4,6 +4,7 @@ defmodule LivePollWeb.PollLive do
   alias LivePoll.Poll.Option
   alias LivePoll.Poll.VoteEvent
   alias LivePoll.Repo
+  alias LivePollWeb.RateLimiter
   import Ecto.Query
 
   @topic "poll:updates"
@@ -45,27 +46,38 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("vote", %{"id" => id}, socket) do
-    # Validate and parse ID first
-    with {int_id, ""} <- Integer.parse(id),
-         # Wrap atomic increment and event creation in a transaction for consistency
-         {:ok, updated_option} <- vote_with_event(int_id) do
-      # Broadcast update with accurate data
-      Phoenix.PubSub.broadcast(
-        LivePoll.PubSub,
-        @topic,
-        {:poll_update,
-         %{
-           id: updated_option.id,
-           votes: updated_option.votes,
-           language: updated_option.text,
-           timestamp: DateTime.utc_now()
-         }}
-      )
+    client_id = RateLimiter.get_client_id(socket)
 
-      {:noreply, socket}
-    else
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid vote option")}
+    case RateLimiter.check_rate(client_id, :vote) do
+      {:ok, _} ->
+        # Validate and parse ID first
+        with {int_id, ""} <- Integer.parse(id),
+             # Wrap atomic increment and event creation in a transaction for consistency
+             {:ok, updated_option} <- vote_with_event(int_id) do
+          # Broadcast update with accurate data
+          Phoenix.PubSub.broadcast(
+            LivePoll.PubSub,
+            @topic,
+            {:poll_update,
+             %{
+               id: updated_option.id,
+               votes: updated_option.votes,
+               language: updated_option.text,
+               timestamp: DateTime.utc_now()
+             }}
+          )
+
+          {:noreply, socket}
+        else
+          _ ->
+            {:noreply, put_flash(socket, :error, "Invalid vote option")}
+        end
+
+      {:error, :rate_limited, %{retry_after: retry_after}} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Too many votes! Please wait #{retry_after} seconds.")
+         |> push_event("rate_limited", %{retry_after: retry_after})}
     end
   end
 
@@ -100,46 +112,62 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("reset_votes", _params, socket) do
-    # Delete all vote events (clears time series data)
-    Repo.delete_all(VoteEvent)
+    client_id = RateLimiter.get_client_id(socket)
 
-    # Reset all votes to 0
-    Repo.all(Option)
-    |> Enum.each(fn option ->
-      changeset = Ecto.Changeset.change(option, votes: 0)
-      Repo.update!(changeset)
-    end)
+    case RateLimiter.check_rate(client_id, :reset_votes) do
+      {:ok, _} ->
+        # Delete all vote events (clears time series data)
+        Repo.delete_all(VoteEvent)
 
-    # Broadcast reset to all connected clients
-    Phoenix.PubSub.broadcast(
-      LivePoll.PubSub,
-      @topic,
-      {:poll_reset, %{timestamp: DateTime.utc_now()}}
-    )
+        # Reset all votes to 0
+        Repo.all(Option)
+        |> Enum.each(fn option ->
+          changeset = Ecto.Changeset.change(option, votes: 0)
+          Repo.update!(changeset)
+        end)
 
-    {:noreply, socket}
+        # Broadcast reset to all connected clients
+        Phoenix.PubSub.broadcast(
+          LivePoll.PubSub,
+          @topic,
+          {:poll_reset, %{timestamp: DateTime.utc_now()}}
+        )
+
+        {:noreply, socket}
+
+      {:error, :rate_limited, _} ->
+        {:noreply, put_flash(socket, :error, "Reset can only be done once per hour.")}
+    end
   end
 
   def handle_event("add_language", %{"name" => name}, socket) when byte_size(name) > 0 do
-    # Check if language already exists
-    existing = Repo.get_by(Option, text: name)
+    client_id = RateLimiter.get_client_id(socket)
 
-    if existing do
-      {:noreply, socket}
-    else
-      # Create new language option
-      %Option{}
-      |> Ecto.Changeset.change(text: name, votes: 0)
-      |> Repo.insert!()
+    case RateLimiter.check_rate(client_id, :add_language) do
+      {:ok, _} ->
+        # Check if language already exists
+        existing = Repo.get_by(Option, text: name)
 
-      # Broadcast update to all clients
-      Phoenix.PubSub.broadcast(
-        LivePoll.PubSub,
-        @topic,
-        {:language_added, %{name: name}}
-      )
+        if existing do
+          {:noreply, socket}
+        else
+          # Create new language option
+          %Option{}
+          |> Ecto.Changeset.change(text: name, votes: 0)
+          |> Repo.insert!()
 
-      {:noreply, socket}
+          # Broadcast update to all clients
+          Phoenix.PubSub.broadcast(
+            LivePoll.PubSub,
+            @topic,
+            {:language_added, %{name: name}}
+          )
+
+          {:noreply, socket}
+        end
+
+      {:error, :rate_limited, _} ->
+        {:noreply, put_flash(socket, :error, "Too many languages added. Please wait.")}
     end
   end
 
@@ -165,13 +193,21 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("seed_data", _params, socket) do
-    # Show seeding modal
-    socket = assign(socket, :seeding_progress, %{show: true})
+    client_id = RateLimiter.get_client_id(socket)
 
-    # Start seeding process asynchronously
-    Process.send_after(self(), :perform_seeding, 100)
+    case RateLimiter.check_rate(client_id, :seed_data) do
+      {:ok, _} ->
+        # Show seeding modal
+        socket = assign(socket, :seeding_progress, %{show: true})
 
-    {:noreply, socket}
+        # Start seeding process asynchronously
+        Process.send_after(self(), :perform_seeding, 100)
+
+        {:noreply, socket}
+
+      {:error, :rate_limited, _} ->
+        {:noreply, put_flash(socket, :error, "Seeding can only be done once per hour.")}
+    end
   end
 
   def handle_info(:perform_seeding, socket) do

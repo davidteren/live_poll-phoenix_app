@@ -87,9 +87,10 @@ defmodule LivePollWeb.PollLiveTest do
       # Mount the LiveView once
       {:ok, view, _html} = live(conn, "/")
 
-      # Simulate 100 concurrent votes through the public API
+      # Simulate 10 concurrent votes through the public API (within rate limit)
+      # This tests atomic increments prevent race conditions
       tasks =
-        for _ <- 1..100 do
+        for _ <- 1..10 do
           Task.async(fn ->
             # Test the actual event handler concurrently
             # Use render_click to simulate real user interaction
@@ -102,9 +103,53 @@ defmodule LivePollWeb.PollLiveTest do
       # Wait for all tasks to complete
       Task.await_many(tasks, 10000)
 
-      # Verify all votes were counted (no lost updates)
+      # Verify all votes were counted (no lost updates due to race conditions)
       updated = Repo.get!(Option, elixir.id)
-      assert updated.votes == 100
+      assert updated.votes == 10
+    end
+  end
+
+  describe "rate limiting" do
+    test "prevents rapid voting beyond limit", %{conn: conn, options: [elixir | _]} do
+      {:ok, view, _html} = live(conn, "/")
+
+      # First 10 votes should succeed (rate limit is 10 per minute)
+      for _ <- 1..10 do
+        view |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+      end
+
+      # Verify 10 votes were counted
+      updated = Repo.get!(Option, elixir.id)
+      assert updated.votes == 10
+
+      # 11th vote should be rate limited - vote count should not increase
+      view |> element("button[phx-value-id='#{elixir.id}']") |> render_click()
+
+      # Vote count should still be 10 (rate limited)
+      updated = Repo.get!(Option, elixir.id)
+      assert updated.votes == 10
+    end
+
+    test "rate limits add_language operation", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/")
+
+      # Add 5 languages (rate limit is 5 per 5 minutes)
+      for i <- 1..5 do
+        view
+        |> element("form[phx-submit='add_language']")
+        |> render_submit(%{"name" => "Language#{i}"})
+      end
+
+      # Verify 5 languages were added (4 initial + 5 new = 9 total)
+      assert Repo.aggregate(Option, :count) == 9
+
+      # 6th language should be rate limited - count should not increase
+      view
+      |> element("form[phx-submit='add_language']")
+      |> render_submit(%{"name" => "Language6"})
+
+      # Count should still be 9 (rate limited)
+      assert Repo.aggregate(Option, :count) == 9
     end
   end
 
