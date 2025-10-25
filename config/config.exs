@@ -17,6 +17,21 @@ config :hammer,
     {Hammer.Backend.ETS,
      [expiry_ms: 60_000 * 60 * 24, cleanup_interval_ms: 60_000 * 10]}
 
+# Configure trusted proxy IPs for X-Forwarded-For header
+# In production, set this to your reverse proxy/load balancer IP addresses
+# Example: config :live_poll, :trusted_proxies, [{10, 0, 0, 1}, {172, 16, 0, 1}]
+config :live_poll, :trusted_proxies, []
+
+# Configure rate limits (optional - defaults are defined in LivePollWeb.RateLimiter)
+# Uncomment and modify to override defaults per environment
+# config :live_poll, :rate_limits, %{
+#   vote: {10, :timer.minutes(1)},
+#   add_language: {5, :timer.minutes(5)},
+#   seed_data: {1, :timer.hours(1)},
+#   reset_votes: {1, :timer.hours(1)},
+#   default: {60, :timer.minutes(1)}
+# }
+
 # Configures the endpoint
 config :live_poll, LivePollWeb.Endpoint,
   url: [host: "localhost"],

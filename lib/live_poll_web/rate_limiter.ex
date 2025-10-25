@@ -6,9 +6,10 @@ defmodule LivePollWeb.RateLimiter do
   computational expense and potential for abuse.
   """
 
-  # Different limits for different actions
+  # Default limits for different actions
   # Format: {max_requests, time_window_in_milliseconds}
-  @limits %{
+  # These can be overridden in config files (e.g., config/dev.exs, config/prod.exs)
+  @default_limits %{
     # 10 votes per minute - allows normal voting but prevents spam
     vote: {10, :timer.minutes(1)},
     # 5 languages per 5 minutes - prevents language spam
@@ -20,6 +21,11 @@ defmodule LivePollWeb.RateLimiter do
     # 60 requests per minute default for any other action
     default: {60, :timer.minutes(1)}
   }
+
+  # Get rate limits from application config or use defaults
+  defp get_limits do
+    Application.get_env(:live_poll, :rate_limits, @default_limits)
+  end
 
   @doc """
   Check if an action is rate limited for a client.
@@ -37,7 +43,8 @@ defmodule LivePollWeb.RateLimiter do
       {:error, :rate_limited, %{limit: 10, retry_after: 45}}
   """
   def check_rate(client_id, action) do
-    {limit, window} = Map.get(@limits, action, @limits.default)
+    limits = get_limits()
+    {limit, window} = Map.get(limits, action, limits.default)
     bucket = "#{client_id}:#{action}"
 
     case Hammer.check_rate(bucket, window, limit) do
@@ -88,7 +95,8 @@ defmodule LivePollWeb.RateLimiter do
       {10, 60000}
   """
   def get_limit(action) do
-    Map.get(@limits, action, @limits.default)
+    limits = get_limits()
+    Map.get(limits, action, limits.default)
   end
 
   # Private functions
@@ -107,9 +115,7 @@ defmodule LivePollWeb.RateLimiter do
   end
 
   defp get_connect_info(socket, key) do
-    socket.private[:connect_info][key]
-  rescue
-    _ -> nil
+    get_in(socket, [:private, :connect_info, key])
   end
 
   defp format_ip({:peer_data, %{address: address}}) do

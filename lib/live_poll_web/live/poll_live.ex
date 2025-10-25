@@ -122,16 +122,15 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("add_language", %{"name" => name}, socket) when byte_size(name) > 0 do
-    client_id = RateLimiter.get_client_id(socket)
+    # Check if language already exists before checking rate limit
+    # This prevents users from being penalized for duplicate submissions
+    if Repo.get_by(Option, text: name) do
+      {:noreply, put_flash(socket, :info, "Language already exists.")}
+    else
+      client_id = RateLimiter.get_client_id(socket)
 
-    case RateLimiter.check_rate(client_id, :add_language) do
-      {:ok, _} ->
-        # Check if language already exists
-        existing = Repo.get_by(Option, text: name)
-
-        if existing do
-          {:noreply, put_flash(socket, :info, "Language already exists.")}
-        else
+      case RateLimiter.check_rate(client_id, :add_language) do
+        {:ok, _} ->
           # Create new language option
           %Option{}
           |> Ecto.Changeset.change(text: name, votes: 0)
@@ -145,13 +144,13 @@ defmodule LivePollWeb.PollLive do
           )
 
           {:noreply, socket}
-        end
 
-      {:error, :rate_limited, %{retry_after: retry_after}} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "Too many languages added. Please wait #{retry_after} seconds.")
-         |> push_event("rate_limited", %{action: "add_language", retry_after: retry_after})}
+        {:error, :rate_limited, %{retry_after: retry_after}} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, "Too many languages added. Please wait #{retry_after} seconds.")
+           |> push_event("rate_limited", %{action: "add_language", retry_after: retry_after})}
+      end
     end
   end
 
