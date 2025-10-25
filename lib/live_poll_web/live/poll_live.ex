@@ -45,32 +45,41 @@ defmodule LivePollWeb.PollLive do
   end
 
   def handle_event("vote", %{"id" => id}, socket) do
-    option = Repo.get!(Option, id)
-    new_votes = option.votes + 1
-    changeset = Ecto.Changeset.change(option, votes: new_votes)
-    updated_option = Repo.update!(changeset)
+    # Validate and parse ID first
+    with {int_id, ""} <- Integer.parse(id),
+         # Atomic increment with RETURNING clause to prevent race conditions
+         {1, [updated_option]} <-
+           from(o in Option,
+             where: o.id == ^int_id,
+             select: o
+           )
+           |> Repo.update_all([inc: [votes: 1]], returning: true) do
+      # Create vote event with accurate count
+      Repo.insert!(%VoteEvent{
+        option_id: updated_option.id,
+        language: updated_option.text,
+        votes_after: updated_option.votes,
+        event_type: "vote"
+      })
 
-    # Capture vote event in time series
-    Repo.insert!(%VoteEvent{
-      option_id: updated_option.id,
-      language: updated_option.text,
-      votes_after: new_votes,
-      event_type: "vote"
-    })
+      # Broadcast update with accurate data
+      Phoenix.PubSub.broadcast(
+        LivePoll.PubSub,
+        @topic,
+        {:poll_update,
+         %{
+           id: updated_option.id,
+           votes: updated_option.votes,
+           language: updated_option.text,
+           timestamp: DateTime.utc_now()
+         }}
+      )
 
-    Phoenix.PubSub.broadcast(
-      LivePoll.PubSub,
-      @topic,
-      {:poll_update,
-       %{
-         id: String.to_integer(id),
-         votes: new_votes,
-         language: option.text,
-         timestamp: DateTime.utc_now()
-       }}
-    )
-
-    {:noreply, socket}
+      {:noreply, socket}
+    else
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid vote option")}
+    end
   end
 
   def handle_event("toggle_theme", _params, socket) do
