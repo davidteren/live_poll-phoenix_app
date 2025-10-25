@@ -1,0 +1,90 @@
+# Pre-commit hooks for LivePoll Phoenix Application
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  # Elixir/Phoenix Checks - Using mix precommit alias
+  - repo: local
+    hooks:
+      - id: mix-precommit
+        name: Mix Precommit (format, compile, test)
+        entry: mix precommit
+        language: system
+        files: '\.(ex|exs|heex)$'
+        pass_filenames: false
+        # This runs: compile --warning-as-errors, deps.unlock --unused, format, test
+  
+  # Critical Issue Checks (from our analysis)
+  - repo: local
+    hooks:
+      - id: check-race-conditions
+        name: Check for Race Conditions
+        entry: sh -c 'if grep -r "Repo.get.*|>.*Repo.update" lib/; then echo "Race condition detected! Use atomic operations."; exit 1; fi'
+        language: system
+        files: '\.ex$'
+        pass_filenames: false
+      
+      - id: check-inline-scripts
+        name: Check for Inline Scripts
+        entry: sh -c 'if grep -r "<script>" lib/**/*.heex 2>/dev/null; then echo "Inline scripts detected! Move to assets/js/"; exit 1; fi'
+        language: system
+        files: '\.heex$'
+        pass_filenames: false
+      
+      - id: check-raw-sql
+        name: Check for Raw SQL
+        entry: sh -c 'if grep -r "Ecto.Adapters.SQL.query!" lib/; then echo "Warning: Raw SQL detected. Consider Ecto queries."; fi'
+        language: system
+        files: '\.ex$'
+        pass_filenames: false
+      
+      - id: check-bang-functions
+        name: Check Bang Functions in Handlers
+        entry: sh -c 'if grep -r "Repo\.\(get\|insert\|update\|delete\)!.*handle_event" lib/; then echo "Warning: Bang functions in event handlers. Use proper error handling."; fi'
+        language: system
+        files: '\.ex$'
+        pass_filenames: false
+  
+  # JavaScript/Assets Checks
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        entry: cd assets && npm run lint
+        language: system
+        files: '\.js$'
+        pass_filenames: false
+      
+      - id: check-bundle-size
+        name: Check Bundle Size
+        entry: sh -c 'if [ -f "assets/vendor/daisyui.js" ]; then echo "Warning: DaisyUI detected but unused. Consider removing."; fi'
+        language: system
+        pass_filenames: false
+  
+  # Security Checks
+  - repo: local
+    hooks:
+      - id: check-dependencies
+        name: Check Dependencies
+        entry: mix deps.audit
+        language: system
+        pass_filenames: false
+        stages: [push]
+      
+      - id: sobelow
+        name: Security Check
+        entry: mix sobelow --config
+        language: system
+        pass_filenames: false
+        stages: [push]
+  
+  # Documentation
+  - repo: local
+    hooks:
+      - id: check-todo
+        name: Check TODOs
+        entry: sh -c 'grep -r "TODO\|FIXME\|XXX" lib/ && echo "TODOs found. Consider addressing before commit." || true'
+        language: system
+        pass_filenames: false
+  
+  # Note: Qodo Merge runs automatically via GitHub app on PRs
+  # No need for pre-commit hooks for Qodo functionality
