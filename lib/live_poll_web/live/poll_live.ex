@@ -29,8 +29,10 @@ defmodule LivePollWeb.PollLive do
         votes_per_minute: 0,
         last_minute_votes: 0,
         trend_data: trend_data,
-        time_range: 60,  # Default time range in minutes
-        seeding_progress: %{show: false}  # Seeding progress modal state
+        # Default time range in minutes
+        time_range: 60,
+        # Seeding progress modal state
+        seeding_progress: %{show: false}
       )
 
     # Schedule periodic stats update and trend tracking
@@ -59,12 +61,13 @@ defmodule LivePollWeb.PollLive do
     Phoenix.PubSub.broadcast(
       LivePoll.PubSub,
       @topic,
-      {:poll_update, %{
-        id: String.to_integer(id),
-        votes: new_votes,
-        language: option.text,
-        timestamp: DateTime.utc_now()
-      }}
+      {:poll_update,
+       %{
+         id: String.to_integer(id),
+         votes: new_votes,
+         language: option.text,
+         timestamp: DateTime.utc_now()
+       }}
     )
 
     {:noreply, socket}
@@ -156,32 +159,50 @@ defmodule LivePollWeb.PollLive do
     # Using much larger weight differences to create dramatic visual separation
     languages_with_weights = [
       # Top tier (most popular) - dominant languages
-      {"Python", 100.0},          # #1 overall, AI/ML/data science
-      {"JavaScript", 85.0},       # Web development king
-      {"TypeScript", 70.0},       # Modern web, growing fast
+      # #1 overall, AI/ML/data science
+      {"Python", 100.0},
+      # Web development king
+      {"JavaScript", 85.0},
+      # Modern web, growing fast
+      {"TypeScript", 70.0},
 
       # Hot/Growing languages - strong presence
-      {"Rust", 45.0},             # Most admired, systems programming
-      {"Go", 40.0},               # Backend, cloud, gaining popularity
+      # Most admired, systems programming
+      {"Rust", 45.0},
+      # Backend, cloud, gaining popularity
+      {"Go", 40.0},
 
       # Strong established languages - solid middle
-      {"C#", 35.0},               # .NET, enterprise, gaming
-      {"C++", 30.0},              # Systems, performance, gaining
-      {"Swift", 25.0},            # iOS development
+      # .NET, enterprise, gaming
+      {"C#", 35.0},
+      # Systems, performance, gaining
+      {"C++", 30.0},
+      # iOS development
+      {"Swift", 25.0},
 
       # Mid-tier - noticeable but smaller
-      {"Kotlin", 20.0},           # Android, JVM
-      {"Elixir", 12.0},           # Functional, Phoenix
+      # Android, JVM
+      {"Kotlin", 20.0},
+      # Functional, Phoenix
+      {"Elixir", 12.0},
 
       # Lower popularity - clearly less popular
-      {"Java", 10.0},             # Declining from peak, still used
-      {"Ruby", 8.0},              # Rails, declining
-      {"PHP", 6.0},               # Web, declining
-      {"Scala", 4.0},             # JVM, niche
-      {"Dart", 4.0},              # Flutter
-      {"Haskell", 2.0},           # Academic, niche
-      {"Clojure", 2.0},           # Lisp, niche
-      {"F#", 1.0}                 # .NET, niche
+      # Declining from peak, still used
+      {"Java", 10.0},
+      # Rails, declining
+      {"Ruby", 8.0},
+      # Web, declining
+      {"PHP", 6.0},
+      # JVM, niche
+      {"Scala", 4.0},
+      # Flutter
+      {"Dart", 4.0},
+      # Academic, niche
+      {"Haskell", 2.0},
+      # Lisp, niche
+      {"Clojure", 2.0},
+      # .NET, niche
+      {"F#", 1.0}
     ]
 
     # Delete all existing options and vote events
@@ -193,9 +214,10 @@ defmodule LivePollWeb.PollLive do
     selected_languages = Enum.take_random(languages_with_weights, num_languages)
 
     # Create options with 0 votes initially
-    options = Enum.map(selected_languages, fn {lang, _weight} ->
-      Repo.insert!(%Option{text: lang, votes: 0})
-    end)
+    options =
+      Enum.map(selected_languages, fn {lang, _weight} ->
+        Repo.insert!(%Option{text: lang, votes: 0})
+      end)
 
     # Backfill vote events over the last hour
     now = DateTime.utc_now()
@@ -224,7 +246,8 @@ defmodule LivePollWeb.PollLive do
         variation = trunc(base_votes * 0.2)
         votes = base_votes + :rand.uniform(variation * 2) - variation
 
-        {option, max(votes, 5)} # Ensure at least 5 votes per language
+        # Ensure at least 5 votes per language
+        {option, max(votes, 5)}
       end)
       |> Map.new()
 
@@ -260,12 +283,13 @@ defmodule LivePollWeb.PollLive do
       new_count = current_count + 1
 
       # Insert vote event with the timestamp
-      {:ok, vote_event} = Repo.insert(%VoteEvent{
-        option_id: option.id,
-        language: option.text,
-        votes_after: new_count,
-        event_type: "seed"
-      })
+      {:ok, vote_event} =
+        Repo.insert(%VoteEvent{
+          option_id: option.id,
+          language: option.text,
+          votes_after: new_count,
+          event_type: "seed"
+        })
 
       # Update the inserted_at timestamp to match our backfilled time
       Ecto.Adapters.SQL.query!(
@@ -343,7 +367,8 @@ defmodule LivePollWeb.PollLive do
 
   def handle_info(:update_stats, socket) do
     # Calculate votes per minute based on recent activity
-    votes_per_minute = socket.assigns.last_minute_votes * 12 # 5 second intervals
+    # 5 second intervals
+    votes_per_minute = socket.assigns.last_minute_votes * 12
 
     socket =
       assign(socket,
@@ -441,7 +466,8 @@ defmodule LivePollWeb.PollLive do
     total_votes = Enum.sum(Enum.map(options, & &1.votes))
     sorted_options = Enum.sort_by(options, & &1.votes, :desc)
 
-    socket = assign(socket, options: options, sorted_options: sorted_options, total_votes: total_votes)
+    socket =
+      assign(socket, options: options, sorted_options: sorted_options, total_votes: total_votes)
 
     {:noreply, socket}
   end
@@ -497,7 +523,7 @@ defmodule LivePollWeb.PollLive do
           # Y axis: 0% at bottom (200), 100% at top (0)
           # Invert: 200 - (percentage * 2)
           x = index * x_spacing
-          y = 200 - (percentage * 2)
+          y = 200 - percentage * 2
           "#{x},#{y}"
         end)
         |> Enum.join(" ")
@@ -526,20 +552,28 @@ defmodule LivePollWeb.PollLive do
       total_votes = Enum.sum(Enum.map(options, & &1.votes))
       vote_counts = options |> Enum.map(fn opt -> {opt.text, opt.votes} end) |> Map.new()
 
-      [%{
-        timestamp: now,
-        percentages: calculate_percentages(options, total_votes),
-        vote_counts: vote_counts
-      }]
+      [
+        %{
+          timestamp: now,
+          percentages: calculate_percentages(options, total_votes),
+          vote_counts: vote_counts
+        }
+      ]
     else
       # Dynamic bucket size and snapshot limit based on time range
-      {bucket_seconds, max_snapshots} = case minutes_back do
-        5 -> {5, 60}           # 5 minutes: 5-second buckets, 60 snapshots
-        60 -> {30, 120}        # 1 hour: 30-second buckets, 120 snapshots
-        720 -> {300, 144}      # 12 hours: 5-minute buckets, 144 snapshots
-        1440 -> {600, 144}     # 24 hours: 10-minute buckets, 144 snapshots
-        _ -> {30, 120}         # Default: 30-second buckets, 120 snapshots
-      end
+      {bucket_seconds, max_snapshots} =
+        case minutes_back do
+          # 5 minutes: 5-second buckets, 60 snapshots
+          5 -> {5, 60}
+          # 1 hour: 30-second buckets, 120 snapshots
+          60 -> {30, 120}
+          # 12 hours: 5-minute buckets, 144 snapshots
+          720 -> {300, 144}
+          # 24 hours: 10-minute buckets, 144 snapshots
+          1440 -> {600, 144}
+          # Default: 30-second buckets, 120 snapshots
+          _ -> {30, 120}
+        end
 
       # Get all languages from events
       all_languages = events |> Enum.map(& &1.language) |> Enum.uniq()
@@ -611,7 +645,8 @@ defmodule LivePollWeb.PollLive do
         end)
 
       snapshots
-      |> Enum.take(-max_snapshots) # Keep last N snapshots based on time range
+      # Keep last N snapshots based on time range
+      |> Enum.take(-max_snapshots)
     end
   end
 
@@ -629,8 +664,8 @@ defmodule LivePollWeb.PollLive do
         |> Enum.map(& &1.votes)
         |> Enum.sum()
 
-      start_angle = (previous_votes / total_votes) * 360
-      slice_angle = (option.votes / total_votes) * 360
+      start_angle = previous_votes / total_votes * 360
+      slice_angle = option.votes / total_votes * 360
       end_angle = start_angle + slice_angle
 
       # If this option has 100% of votes, draw a full circle
@@ -640,11 +675,15 @@ defmodule LivePollWeb.PollLive do
         inner_radius = 50
 
         # First semicircle (top half)
-        path1 = "M 100 #{100 - outer_radius} A #{outer_radius} #{outer_radius} 0 0 1 100 #{100 + outer_radius}"
+        path1 =
+          "M 100 #{100 - outer_radius} A #{outer_radius} #{outer_radius} 0 0 1 100 #{100 + outer_radius}"
+
         # Second semicircle (bottom half)
         path2 = "A #{outer_radius} #{outer_radius} 0 0 1 100 #{100 - outer_radius}"
         # Inner circle (reverse direction)
-        path3 = "M 100 #{100 - inner_radius} A #{inner_radius} #{inner_radius} 0 0 0 100 #{100 + inner_radius}"
+        path3 =
+          "M 100 #{100 - inner_radius} A #{inner_radius} #{inner_radius} 0 0 0 100 #{100 + inner_radius}"
+
         path4 = "A #{inner_radius} #{inner_radius} 0 0 0 100 #{100 - inner_radius}"
 
         "#{path1} #{path2} #{path3} #{path4} Z"

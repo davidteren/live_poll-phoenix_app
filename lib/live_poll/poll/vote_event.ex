@@ -6,7 +6,7 @@ defmodule LivePoll.Poll.VoteEvent do
     field :language, :string
     field :votes_after, :integer
     field :event_type, :string, default: "vote"
-    
+
     belongs_to :option, LivePoll.Poll.Option
 
     timestamps(type: :utc_datetime, updated_at: false)
@@ -20,4 +20,3 @@ defmodule LivePoll.Poll.VoteEvent do
     |> validate_inclusion(:event_type, ["vote", "seed", "reset"])
   end
 end
-
