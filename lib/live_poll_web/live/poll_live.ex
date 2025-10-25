@@ -50,8 +50,14 @@ defmodule LivePollWeb.PollLive do
 
   def handle_event("add_language", %{"name" => name}, socket) when byte_size(name) > 0 do
     case Polls.add_language(name) do
-      {:ok, _option} -> {:noreply, socket}
-      {:error, _} -> {:noreply, socket}
+      {:ok, _option} ->
+        {:noreply, socket}
+
+      {:error, reason} when is_binary(reason) ->
+        {:noreply, put_flash(socket, :error, reason)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to add language.")}
     end
   end
 

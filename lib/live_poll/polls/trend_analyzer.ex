@@ -95,8 +95,9 @@ defmodule LivePoll.Polls.TrendAnalyzer do
     # Dynamic bucket size and snapshot limit based on time range
     {bucket_seconds, max_snapshots} = get_bucket_config(minutes_back)
 
-    # Get all languages from events
-    all_languages = events |> Enum.map(& &1.language) |> Enum.uniq()
+    # Get all languages from all options in the database
+    # This ensures languages without recent votes are still included in trend data
+    all_languages = Repo.all(Option) |> Enum.map(& &1.text) |> Enum.uniq()
 
     # Group events by bucket
     events_by_bucket = group_events_by_bucket(events, bucket_seconds)

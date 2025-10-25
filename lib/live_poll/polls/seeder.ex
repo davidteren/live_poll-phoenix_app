@@ -158,61 +158,48 @@ defmodule LivePoll.Polls.Seeder do
     |> Map.new()
   end
 
-  # Backfill vote events with random timestamps
+  # Backfill vote events with random timestamps using bulk insert for performance
   defp backfill_vote_events(options, target_votes, hours_back) do
     now = DateTime.utc_now()
     seconds_back = hours_back * 3600
 
-    # Create vote events with completely random timestamps (like real-world data)
-    # Each vote happens at a random time within the specified period
-    vote_events =
+    # Prepare all vote events for bulk insertion
+    all_events_to_insert =
       Enum.flat_map(options, fn option ->
         total_votes = Map.get(target_votes, option)
 
-        # Each vote gets a completely random timestamp within the period
-        Enum.map(1..total_votes, fn vote_num ->
-          # Random timestamp anywhere in the time period
-          seconds_ago = :rand.uniform(seconds_back)
-          timestamp = DateTime.add(now, -seconds_ago, :second)
+        # Generate random timestamps for this option
+        timestamps =
+          Enum.map(1..total_votes, fn _vote_num ->
+            # Random timestamp anywhere in the time period
+            seconds_ago = :rand.uniform(seconds_back)
+            DateTime.add(now, -seconds_ago, :second)
+          end)
+          # Sort timestamps for this option to calculate cumulative votes
+          |> Enum.sort(DateTime)
 
-          %{
-            option: option,
-            vote_number: vote_num,
-            timestamp: timestamp
-          }
-        end)
+        # Build event structs with cumulative vote counts
+        {_final_count, events_with_counts} =
+          Enum.map_reduce(timestamps, 0, fn timestamp, count ->
+            new_count = count + 1
+
+            event_struct = %{
+              option_id: option.id,
+              language: option.text,
+              votes_after: new_count,
+              event_type: "seed",
+              inserted_at: timestamp,
+              updated_at: timestamp
+            }
+
+            {event_struct, new_count}
+          end)
+
+        events_with_counts
       end)
-      # Sort by timestamp so votes happen in chronological order
-      |> Enum.sort_by(& &1.timestamp, DateTime)
 
-    # Insert vote events in chronological order
-    # Track cumulative votes for each option
-    initial_counts = Map.new(options, fn opt -> {opt.id, 0} end)
-
-    Enum.reduce(vote_events, initial_counts, fn event, vote_counts ->
-      option = event.option
-      current_count = Map.get(vote_counts, option.id)
-      new_count = current_count + 1
-
-      # Insert vote event with the timestamp
-      {:ok, vote_event} =
-        Repo.insert(%VoteEvent{
-          option_id: option.id,
-          language: option.text,
-          votes_after: new_count,
-          event_type: "seed"
-        })
-
-      # Update the inserted_at timestamp to match our backfilled time
-      Ecto.Adapters.SQL.query!(
-        Repo,
-        "UPDATE vote_events SET inserted_at = $1 WHERE id = $2",
-        [event.timestamp, vote_event.id]
-      )
-
-      # Update vote count tracker
-      Map.put(vote_counts, option.id, new_count)
-    end)
+    # Bulk insert all events at once for much better performance
+    Repo.insert_all(VoteEvent, all_events_to_insert)
   end
 
   # Update final vote counts on options
