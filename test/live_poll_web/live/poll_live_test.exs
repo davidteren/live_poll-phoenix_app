@@ -2,6 +2,7 @@ defmodule LivePollWeb.PollLiveTest do
   use LivePollWeb.ConnCase
 
   import Phoenix.LiveViewTest
+  import Ecto.Query
 
   alias LivePoll.Poll.Option
   alias LivePoll.Repo
@@ -77,6 +78,31 @@ defmodule LivePollWeb.PollLiveTest do
       # Both clients should see the update
       assert render(view1) =~ "1 vote"
       assert render(view2) =~ "1 vote"
+    end
+
+    test "handles concurrent votes without losing updates", %{options: [elixir | _]} do
+      # Reset vote count to 0
+      Repo.update!(Ecto.Changeset.change(elixir, votes: 0))
+
+      # Simulate 100 concurrent votes using atomic increments
+      tasks =
+        for _ <- 1..100 do
+          Task.async(fn ->
+            # Directly test the atomic increment logic
+            from(o in Option,
+              where: o.id == ^elixir.id,
+              select: o
+            )
+            |> Repo.update_all([inc: [votes: 1]], returning: true)
+          end)
+        end
+
+      # Wait for all tasks to complete
+      Task.await_many(tasks, 5000)
+
+      # Verify all votes were counted (no lost updates)
+      updated = Repo.get!(Option, elixir.id)
+      assert updated.votes == 100
     end
   end
 
